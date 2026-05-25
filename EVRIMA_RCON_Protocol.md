@@ -114,7 +114,7 @@ Every opcode below was confirmed by sending `0x02 <opcode>` and reading the serv
 | `0x30` | KickPlayer | `SteamID64` |
 | `0x40` | GetPlayerList | (none) |
 | `0x50` | Save | (none) |
-| `0x60` | Pause | (none) |
+| `0x60` | Pause³ | (none) |
 | `0x70` | Command | (free-form Unreal-style command) |
 | `0x77` | GetPlayerData | (none; returns full per-player data) |
 | `0x81` | ToggleWhitelist | (none) |
@@ -132,6 +132,7 @@ Every opcode below was confirmed by sending `0x02 <opcode>` and reading the serv
 
 1. Auth uses opcode `0x01` directly, NOT the `0x02` ExecCommand prefix. It is its own frame type.
 2. These opcodes appeared as named entries in the probe log. Their exact in-game effect and full argument format beyond what is shown was not independently verified.
+3. `0x60 Pause` appears in the probe log (the opcode name exists in the server's command table) but multiple users report it times out with no observable in-game effect. Likely a stub or broken in this server version. If you can get it to actually pause the world, please open an issue with the working invocation.
 
 ## Verified absence: no slay opcode
 
