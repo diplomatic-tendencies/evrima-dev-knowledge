@@ -1,5 +1,7 @@
 # EVRIMA Dev Knowledge
 
+> English is my third language and the documentation includes AI-assisted translation.
+
 A practical reference for building server-side mods on The Isle EVRIMA. Twenty-plus documents covering UE4SS Lua patterns, crash-class gotchas, mod architectures, C++ side-mod toolchain, asset extraction, and the RCON binary protocol.
 
 Built from real production mod development. Every pattern was confirmed live on a dedicated server. Every gotcha was paid for with at least one crash or a rolled-back mod version. Pull requests and issues welcome.
