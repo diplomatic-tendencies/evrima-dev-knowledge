@@ -39,19 +39,6 @@ Open a pull request. The expected shape:
 - New reference catalog: create `EVRIMA_<Topic>.md` and link it from the README.
 - Updates to an existing doc: edit the doc and mention the change in the PR description.
 
-### Style guide
-
-The existing docs use a few consistent conventions:
-
-- Lab-notebook voice. First person "I" when sharing observed behavior, impersonal voice for general statements. No "we" or "our."
-- No em dashes. Periods, commas, parens, or hyphens.
-- Code blocks use the appropriate language tag (`lua`, `cpp`, `powershell`, `bash`, `json`).
-- File paths use `<game>/` as the root placeholder for the EVRIMA install dir.
-- Steam IDs in examples use `76561198XXXXXXX` placeholders, never real IDs.
-- Credentials (AES keys, EOS client IDs, RCON passwords) are never included; redact to `<YOUR_X>` placeholders.
-
-If you're adding a new doc, the simplest path is to copy the structure of an existing one as a template.
-
 ### Verifying changes
 
 If your change touches a code snippet or a specific behavior claim, verify it on a live dedicated server before submitting. The docs' value depends on the claims being accurate. "I think this works" is worse than no claim at all.
