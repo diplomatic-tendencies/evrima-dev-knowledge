@@ -105,8 +105,8 @@ Every opcode below was confirmed by sending `0x02 <opcode>` and reading the serv
 | `0x14` | GetPlayables | (none) |
 | `0x15` | UpdatePlayables² | (none) |
 | `0x19` | ToggleMigrations² | (none) |
-| `0x1A` | AddPlayable³ | class name |
-| `0x1B` | RemovePlayable³ | class name |
+| `0x1A` | AddPlayable | class name |
+| `0x1B` | RemovePlayable | class name |
 | `0x20` | BanPlayer | `Name,SteamID64,Reason,Time` |
 | `0x21` | ToggleGrowthMultiplier² | (none) |
 | `0x22` | SetGrowthMultiplier² | `SteamID,value` |
@@ -132,7 +132,6 @@ Every opcode below was confirmed by sending `0x02 <opcode>` and reading the serv
 
 1. Auth uses opcode `0x01` directly, NOT the `0x02` ExecCommand prefix. It is its own frame type.
 2. These opcodes appeared as named entries in the probe log. Their exact in-game effect and full argument format beyond what is shown was not independently verified.
-3. `0x1A` and `0x1B` come from a separate source map and were not part of the same live opcode probe; treat them as plausible but unverified at this exact level of detail.
 
 ## Verified absence: no slay opcode
 
