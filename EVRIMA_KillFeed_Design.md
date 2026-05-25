@@ -1,5 +1,7 @@
 # KillFeed design
 
+> Bot-side specifics in this document (table schemas, the "bonecoin" naming, the 0.5 per kg payout rate, the 20-second combat window) reflect one example production integration. Treat them as illustrative, not as universal requirements.
+
 KillFeed emits one event per player kill to a tailable NDJSON file for downstream bot consumption (typically a bonecoin-style economy that pays a player per kg of dino killed). This document covers the architecture, the hook-source research that informed the design, and the upgrade path from a pure-Lua implementation to a UE4SS C++ side mod for the version that catches DoT and environmental kills.
 
 ## Final spec
