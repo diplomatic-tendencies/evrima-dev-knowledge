@@ -231,12 +231,12 @@ These hook successfully but never actually fire in normal play (they exist as de
 - `RequestSpawnInNest`
 - `OnPawnDeath`
 
-These fail to register at all (UFunction not found on this build):
+These did not register on the class paths I personally tried (this is "didn't work for me at the paths I tested", not "impossible" — if you have a working hook path for any of these, please open an issue or PR):
 
 - `K2_PostLogin`, `PostLogin`, `K2_OnLogout`, `HandleStartingNewPlayer`, `GenericPlayerInitialization`, `OnPostLogin` on every game mode candidate
 - `ReceivedPlayer`, `K2_OnDestroyed`, `ServerInitConnection` on every player controller candidate
 
-The lesson: do not assume a UFunction by name. Build a spy mod that hooks every plausible candidate first, run normal play, observe which ones fire. Many of these are dead code paths from the game's perspective.
+The lesson: do not assume a UFunction by name. Build a spy mod that hooks every plausible candidate first, run normal play, observe which ones fire. Some of these may be reachable through a class path I didn't try; others may be dead code paths from the game's perspective.
 
 ## Closing notes
 
