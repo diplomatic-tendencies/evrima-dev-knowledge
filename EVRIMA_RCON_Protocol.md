@@ -1,5 +1,7 @@
 # EVRIMA RCON binary protocol
 
+> The byte-to-command mappings in this document were extracted from a single third-party bot's source code and never independently verified by live probing. Treat as a starting point, not as fact. Corrections via issues welcome.
+
 EVRIMA's RCON is not Source RCON. It is a custom binary protocol over TCP that uses single-byte command codes plus null-terminated text payloads.
 
 This is the reference for that protocol, including the 13 known command codes (extracted from a working community bot's reverse-engineered code), the authentication flow, and notes on what's confirmed vs unconfirmed.
