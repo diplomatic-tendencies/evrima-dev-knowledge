@@ -197,7 +197,6 @@ For external tooling, RCON is the cheapest path to:
 - Whitelist management (`0x81`-`0x83`).
 - Save triggering before maintenance (`0x50`).
 - Reading the player list and per-player data (`0x40`, `0x77`).
-- Pausing the world (`0x60`).
 - Toggling AI features (`0x90`-`0x94`).
 
 For features that need real-time event observation (kill feeds, position tracking, chat reading), RCON is not sufficient. The Lua-mod-side NDJSON streams (PlayerStats, KillFeed) are the path for that.
@@ -207,3 +206,7 @@ For features that need real-time event observation (kill feeds, position trackin
 The RCON protocol is well-suited for "external action on the server" but limited for "observation of server state." Use it for commanding plus periodic queries; use Lua-mod-side NDJSON streams for real-time event observation.
 
 The frame structure (the `0x02` ExecCommand prefix) is the single most important detail to get right. Sending bare opcodes without the `0x02` prefix produces silent rejection or unexpected behavior on the server side.
+
+## Credits
+
+Live opcode probe across the full `0x00`-`0xFF` range, verified frame structure, response-termination behaviors, and ongoing opcode confirmations by **MehO** and **Tinymanz**.
