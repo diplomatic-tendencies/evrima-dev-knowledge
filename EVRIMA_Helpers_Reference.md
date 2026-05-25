@@ -312,13 +312,19 @@ local function enumerateOnlinePlayers()
 end
 ```
 
-Wire them at boot:
+### Wiring (required, easy to miss)
+
+These helpers must be **called** at boot, not just defined. Pasting the function bodies into your module without invoking `presenceRegisterHook()` and `presenceStartRefreshTick()` leaves the registry empty forever. The symptom is `enumerateOnlinePlayers()` always returning `{}` even with players connected.
 
 ```lua
-registerChatHook()  -- your own chat hook setup
-presenceRegisterHook()
-presenceStartRefreshTick()  -- REQUIRED; without this the registry empties between heartbeats
+registerChatHook()           -- your own chat hook setup
+presenceRegisterHook()       -- installs the SetAdminCred heartbeat hook
+presenceStartRefreshTick()   -- starts the 15-second registry refresh tick
 ```
+
+`presenceRegisterHook` is what feeds the registry from connect plus heartbeat events. `presenceStartRefreshTick` is what keeps entries alive between SetAdminCred bursts (which fire only every 7 to 8 minutes in steady state). If either is missing, the registry stays empty or empties out within a few minutes of every burst.
+
+After boot, verify by checking `UE4SS.log` for `Presence heartbeat hook registered (SetAdminCred)` and `Presence refresh tick started (15s interval)`. If those lines are missing, the wiring did not run.
 
 ## registerSafeHook
 
