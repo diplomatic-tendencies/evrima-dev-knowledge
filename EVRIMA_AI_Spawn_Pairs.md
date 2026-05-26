@@ -78,8 +78,6 @@ These use the Blueprint-wrapped controllers. Equivalent to native versions where
 
 ## Cross-species pairs, for species with no dedicated AI controller
 
-These species don't have their own AI controller (cut content or playable-only). They work when paired with a physiologically-similar species' brain. Verified in-game: the AI behavior makes sense for the pawn body (e.g. Triceratops fled from a player Trex using Diabloceratops AI).
-
 | Species | Pawn class | Borrowed controller |
 |---|---|---|
 | Triceratops | `/Game/TheIsle/Core/Characters/Dinosaurs/Triceratops/BP_Triceratops.BP_Triceratops_C` | `/Game/TheIsle/Core/AI/Controllers/Dinos/BP_AI_Diabloceratops_Controller.BP_AI_Diabloceratops_Controller_C` |
@@ -125,11 +123,9 @@ These species don't have their own AI controller (cut content or playable-only).
 
 | Species | Reason |
 |---|---|
-| Baryonyx | Spawn-failed on terrain at chosen test location. Class is valid, retest on different terrain. |
-| Austroraptor | Spawn-failed on terrain at chosen test location. Class is valid, retest on different terrain. |
-| Elite Catfish (`BP_Elite_Fish_CatFish_C`) | Possessed but didn't move. Fish AI almost certainly needs the pawn to be in water at spawn. |
+| Elite Catfish (`BP_Elite_Fish_CatFish_C`) | Possessed but didn't move. Fish AI needs the pawn to be in water at spawn. |
 | Elite Coelacanth (`BP_Elite_Fish_Coelacanth_C`) | Same as above. |
-| School fish (5 variants: Catfish, Hoplosternum, Longear, MuskelLunge, RainbowFish) | Untested but assume same water-context requirement. |
+| School fish (5 variants: Catfish, Hoplosternum, Longear, MuskelLunge, RainbowFish) | same water-context requirement. |
 | Kentrosaurus | Class loads but `SpawnActor` returns nullptr - confirmed stub class, no functional default subobjects. |
 | Parasaurolophus | Same as Kentrosaurus - stub class. |
 

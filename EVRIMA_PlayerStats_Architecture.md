@@ -17,7 +17,7 @@ Schema notes:
 - `ts` is unix seconds, the snapshot wall-clock time.
 - `steam` is the player's steam ID.
 - `class` is the stripped class name (no path, no "BlueprintGeneratedClass" prefix).
-- `groupId` may be empty string if the player is solo. Group semantics in `EVRIMA_Lua_Safety_Rules.md` are not relevant here; the GroupId comes from the per-player API.
+- `groupId` is the int32 from `TICharacterBase.GroupId`. Every connected player has a **unique non-zero** GroupId by default (the server assigns a large pseudo-random int per player). Players "in a group" share the same value. Detect solo vs grouped by counting occurrences across the snapshot batch, not by checking for empty/zero. (A naive `gid > 0` filter excludes nothing because every player has a nonzero gid.)
 - Location coordinates are in engine space (X, Y, Z). Note that the HUD displays Y as latitude and X as longitude; convert in your consumer if you need HUD-style display.
 
 The file is append-only. Consumers tail it, parse new lines, and update their state.

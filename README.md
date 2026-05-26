@@ -97,6 +97,4 @@ Code snippets (Lua, C++, PowerShell, JSON schemas) are additionally available un
 
 ## Version note
 
-The patterns here reflect EVRIMA dedicated server modding as verified against UE 5.6 and UE4SS v3.0.1, mid-2026. Some specific behaviors (the SetAdminCred heartbeat cadence, the SetSlot batching limit, the specific UFunctions that fire vs don't) may change with EVRIMA updates; re-verify before relying on edge-case behavior in newer game versions.
-
-The crash-class patterns (FString marshaling, K2_DestroyActor on stale wrappers, FFrame parameter unwrapping) are UE4SS-Lua-fundamental and unlikely to change in a way that invalidates the safety rules. The presence-registry and state-restore patterns are similarly stable.
+The patterns here reflect EVRIMA dedicated server modding as verified against UE 5.6 and UE4SS v3.0.1, mid-2026. Some specific behaviors (the SetAdminCred heartbeat cadence, the SetSlot batching limit, the specific UFunctions that fire vs don't) may change with EVRIMA updates; re-verify before relying on edge-case behavior.

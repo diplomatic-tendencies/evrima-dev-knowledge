@@ -1,6 +1,6 @@
 # DinoStorage architecture
 
-DinoStorage is a state-restore mod for The Isle EVRIMA. It lets players store a snapshot of their current dino and later redeem the same dino back, preserving every restorable stat. The current production version (v021) handles vitals, growth, max-vitals, all 16 mutation slots, prime status, elder-replication-stacks (Life-tier counter), quest-mutation unlocks, all 9 nutrients, and skin colors.
+DinoStorage is a state-restore mod for The Isle EVRIMA. It lets players store a snapshot of their current dino and later redeem the same dino back, preserving every restorable stat. The current production version (v021) handles vitals, growth, max-vitals, all 16 mutation slots, prime status, elder-replication-stacks (Life-tier counter), quest-mutation unlocks, all nutrients, and skin colors.
 
 This document describes the architecture and the design decisions that produced the current version. The technical implementation of the underlying patterns (mutation persistence, elder stacks, customizer fields) lives in separate cookbook documents.
 
@@ -81,7 +81,7 @@ After both fixes, every mutation case round-trips cleanly: regular slots, quest 
 
 ## Skin handling
 
-Skin colors are restored via the 7 FLinearColor fields on `pawn.CustomizerData`. The full pattern is in `EVRIMA_Customizer_Field_Map.md`. DinoStorage uses the per-field write path plus a `bumpPureBlack` helper to defeat the engine's pure-zero sentinel that would otherwise restore default colors after a relog.
+Skin colors are restored via the 7 FLinearColor fields on `pawn.CustomizerData` (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`). The full pattern is in `EVRIMA_Customizer_Field_Map.md`. DinoStorage uses the per-field write path plus a `bumpPureBlack` helper to defeat the engine's pure-zero sentinel that would otherwise restore default colors after a relog.
 
 ## Lifecycle and chat hook integration
 
@@ -112,12 +112,9 @@ The per-player stored state file has this top-level structure:
   "location": {"x": 12345.0, "y": 67890.0, "z": 100.0,
                "pitch": 0, "yaw": 90, "roll": 0},
   "prime": {
-    "isPrime": true,
-    "growthFinished": true, "multipleLocations": true,
-    "socialized": true, "drankFromMultipleSources": true,
-    "ateVariety": true, "didNotInteractWithHumans": true,
-    "survived": true, "recovered": true,
-    "earnedFavor": true, "usedSpecialAbility": true
+    "eligible": true,
+    "cond1": true,  "cond2": true,  "cond3": true,  "cond4": true,  "cond5": true,
+    "cond6": true,  "cond7": true,  "cond8": true,  "cond9": true,  "cond10": true
   },
   "nutrients": {
     "carb": 100, "protein": 80, "lipid": 60, "bones": 40,
@@ -140,13 +137,13 @@ The per-player stored state file has this top-level structure:
     "Traumatic Thrombosis", "Multichambered Lungs"
   ],
   "skin": {
-    "body":      {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "back":      {"R": 0.3, "G": 0.3, "B": 0.3, "A": 1.0},
-    "belly":     {"R": 0.8, "G": 0.8, "B": 0.8, "A": 1.0},
-    "accent":    {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
-    "primary":   {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "secondary": {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
-    "paint":     {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0},
+    "body":       {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
+    "markings":   {"R": 0.3, "G": 0.3, "B": 0.3, "A": 1.0},
+    "flank":      {"R": 0.8, "G": 0.8, "B": 0.8, "A": 1.0},
+    "underbelly": {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
+    "detail":     {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
+    "eyes":       {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
+    "breed":      {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0},
     "skinVariation": 0.5,
     "patternIndex": 2
   }

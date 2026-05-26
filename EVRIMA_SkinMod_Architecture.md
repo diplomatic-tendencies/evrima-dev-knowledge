@@ -9,7 +9,14 @@ The architectural challenge is not the color writing itself (the customizer fiel
 Three commands cover the entire user-facing API:
 
 - `!skin <r> <g> <b>` sets every color slot to the same RGB color. Quick test command.
-- `!skin <slot> <r> <g> <b>` sets one slot. Slot names: `body`, `back`, `belly`, `accent`, `primary`, `secondary`, `paint`.
+- `!skin <slot> <r> <g> <b>` sets one slot. Slot aliases accepted by SkinMod's parser:
+  - `body` → `BodyColor`
+  - `markings` / `marks` → `MarkingsColor`
+  - `flank` → `FlankColor`
+  - `underbelly` / `belly` → `UnderbellyColor`
+  - `detail` / `details` / `detail1` → `Detail1Color`
+  - `eyes` / `eye` → `EyesColor`
+  - `breed` / `display` / `male` → `MaleDisplayColor`
 - `!skinreset` reverts to the engine's stored skin (clears the mod's per-player override).
 
 Color values accept either `0.0` to `1.0` floats or `0` to `255` integers; the parser detects which based on the value range.
@@ -74,13 +81,13 @@ The per-player JSON file:
   "steam": "76561198XXXXXXX",
   "updatedAt": 1716508800,
   "colors": {
-    "body":      {"R": 0.5, "G": 0.8, "B": 0.2, "A": 1.0},
-    "back":      {"R": 0.4, "G": 0.7, "B": 0.1, "A": 1.0},
-    "belly":     {"R": 0.9, "G": 0.9, "B": 0.9, "A": 1.0},
-    "accent":    {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
-    "primary":   {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "secondary": {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
-    "paint":     {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0}
+    "body":       {"R": 0.5, "G": 0.8, "B": 0.2, "A": 1.0},
+    "markings":   {"R": 0.4, "G": 0.7, "B": 0.1, "A": 1.0},
+    "flank":      {"R": 0.9, "G": 0.9, "B": 0.9, "A": 1.0},
+    "underbelly": {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
+    "detail":     {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
+    "eyes":       {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
+    "breed":      {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0}
   }
 }
 ```

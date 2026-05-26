@@ -53,13 +53,11 @@ The output format that's worked reliably across the pipeline is glTF. Both stati
 
 ## Verified extractions
 
-Several species have been extracted end-to-end and validated:
+End-to-end verified live (mesh + skeleton + default colors + textures, loaded into a glTF viewer / Blender):
 
-- Pteranodon: full mesh, skeleton, default colors. Matches in-game appearance.
-- Tyrannosaurus: full mesh, skeleton, default colors.
-- Triceratops (cut content): full mesh, skeleton, default colors. Renders correctly when loaded into Blender.
+- **Pteranodon** — 2026-05-15. Full extraction matched in-game appearance.
 
-The patterns generalize. Any species in the UHT dump under `/Game/TheIsle/Core/Characters/Dinosaurs/` can be extracted with the same procedure.
+The procedure is identical for any species in the UHT dump under `/Game/TheIsle/Core/Characters/Dinosaurs/`. The path layouts and material parameter names are consistent across species (see "Asset paths" notes below), so additional species should work without code changes — but only Pteranodon has been validated end-to-end on this server build. Treat other species as untested-but-expected-to-work; re-validate after each game patch.
 
 ## Extraction script structure
 
@@ -126,5 +124,3 @@ This is useful for the bot side of a kill-feed integration. The bot can compute 
 The extraction pipeline took a few iterations to get right, mostly around mount order and the NuGet-vs-master CUE4Parse issue. Once the toolchain is set up, extraction is fast (an entire dino species mesh plus textures in under 5 seconds).
 
 For ongoing use, build a small wrapper script that takes "species name" as input and outputs the standard set (mesh as glTF, all textures as PNG, default colors as JSON). One script invocation per species means low friction for "I need to look at the Allosaurus model" style ad-hoc work.
-
-Refer to `EVRIMA_Lua_Safety_Rules.md` for the constraint that FString fields on UE structs cannot be safely read or written from Lua. This applies to in-game struct access, NOT to offline asset extraction. CUE4Parse reads asset files; it does not interact with the running game.

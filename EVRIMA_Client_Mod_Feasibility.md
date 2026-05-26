@@ -6,13 +6,13 @@ This is the honest assessment of what is and isn't feasible for client-side mods
 
 The first thing to verify (and one that's easy to misclaim): Easy Anti-Cheat IS present on EVRIMA. Earlier community discussions occasionally said it wasn't; that was wrong, and tooling has confirmed EAC is loaded on the client side.
 
-EAC's behavior on EVRIMA:
+EAC's verified-on-EVRIMA behaviors:
 
-- Loaded on the client at game launch.
-- Verifies game binary integrity (the .exe and core DLLs).
-- Allows foreign DLLs loaded at the standard proxy slot (`dwmapi.dll`), which is how UE4SS achieves client-side injection on games that support it.
-- Detects and rejects ring-3 process injection attempts.
-- Refuses to launch if a VM is detected.
+- Loaded on the client at game launch (confirmed by the `EasyAntiCheat/` directory and `InstallAntiCheat.bat` shipping with the client install).
+- Allows foreign DLLs loaded at the standard proxy slot (`dwmapi.dll`) — verified 2026-05-21 by reaching the main menu with Wine's stub `dwmapi` loaded into that slot. This is how UE4SS would in principle inject client-side on games that allow it.
+- Refuses to launch the client when a VM is detected (banner-stage block, verified). Server mode is unaffected.
+
+EAC almost certainly applies its standard suite of additional protections (binary integrity checks, anti-injection checks beyond the proxy slot, etc.); only the behaviors above were directly probed. Don't rely on the absence of any unverified check.
 
 The "allows foreign DLLs at proxy slot" point is what makes client UE4SS theoretically possible. EAC's check is structured to permit the proxy DLL pattern that UE4SS uses for client injection.
 
@@ -45,11 +45,11 @@ The cross-platform consequence: `.pak` mods work on any client (Windows, plus fu
 
 ## What CANNOT work client-side (without EAC violations)
 
-- Modifying client-side code (e.g. patching the .exe).
+- Modifying client-side code (e.g. patching the .exe). EAC's standard integrity checks will catch this.
 - Injecting custom DLLs outside the proxy slot.
-- Running UE4SS Lua client-side on Wine.
+- Running UE4SS Lua client-side on Wine (separate issue — upstream UE4SS bug, not EAC).
 - Running the client in a VM.
-- Bypassing EAC's integrity checks.
+- Any active EAC bypass / tamper.
 
 Requests for client-side mods like "remove this UI element" or "change this input behavior" or "show this overlay during play" generally hit a "no, EAC doesn't allow it" wall. The exceptions are rare and case-specific.
 

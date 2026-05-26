@@ -184,7 +184,7 @@ The pattern looks heavier than it needs to be at first. The reason for each piec
 
 **Re-derive the controller per iteration.** Hook parameter wrappers are unstable across ticks. `gm:GetControllerBySteamId(steam)` on each iteration is cheap and always returns a fresh valid pointer for online steams.
 
-**180-second expiry.** Two missed heartbeats before TTL eviction. For UI, this means dead players take roughly 3 minutes to disappear in the worst case. That tradeoff is acceptable because precise disconnect detection doesn't exist on this build (see next section).
+**180-second expiry.** With a 7–8-minute heartbeat cadence, the TTL is NOT the primary eviction mechanism — the 15-second active refresh tick is. The TTL is a safety net for cases the refresh tick misses (e.g. crashed game-mode lookup, mod reload mid-tick). In practice, dead players are typically evicted within 15–30 seconds via the refresh tick's `GetControllerBySteamId` returning nil, well before the 180s TTL fires.
 
 **Inline eviction on controller-gone.** If `gm:GetControllerBySteamId(steam)` returns nil, the player is truly gone. Evict immediately instead of waiting the 180-second expiry. Cuts eviction latency in practice.
 
@@ -204,7 +204,7 @@ The server console logs `LogTheIsleJoinData: [...] Left The Server while not bei
 
 These hook successfully via `RegisterHook` and actually fire during normal play:
 
-- `/Script/TheIsle.TIPlayerController:SetAdminCred(bool)` is the universal heartbeat (about every 90 seconds in churn-heavy testing, 7 minutes in steady state).
+- `/Script/TheIsle.TIPlayerController:SetAdminCred(bool)` is the universal heartbeat. Steady-state cadence is bursts of two fires ~14 seconds apart, with bursts spaced ~7–8 minutes apart (verified 2026-05-18 after correcting an earlier "~90 seconds" observation that turned out to be inflated by connect/reconnect re-evals in a noisy test). The 15-second active refresh tick (not the heartbeat hook) is what keeps the registry fresh between bursts.
 - `/Script/TheIsle.TIPlayerController:SetDevCred(bool)` fires alongside SetAdminCred. Could also serve as heartbeat.
 - `/Script/TheIsle.TIPlayerController:PrepareSafeLogout()` fires when safe logout starts. Fires twice per initiation.
 - `/Script/TheIsle.TIPlayerController:GetChatMessage(...)` fires when chat is received. One fire per receiver in range, hence the dedup requirement on chat handlers.

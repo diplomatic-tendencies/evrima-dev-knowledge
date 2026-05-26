@@ -51,22 +51,6 @@ Verified working as of mid-2026:
 
 The total toolchain footprint is roughly 15 to 20 GB. NOT a full Unreal Engine install; UE4SS builds against its own headers plus a small UE pseudo-header dump.
 
-## Installation gotchas
-
-**VS 2022 winget install with --passive returns success after caching workload packages without installing them.** The IDE shell installs but the C++ workload doesn't. After the winget install, run `setup.exe modify` directly with the workload args:
-
-```powershell
-& "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" `
-    modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Community" `
-    --add Microsoft.VisualStudio.Workload.NativeDesktop `
-    --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-    --add Microsoft.VisualStudio.Component.Windows11SDK.22621 `
-    --add Microsoft.VisualStudio.Component.VC.CMake.Project `
-    --includeRecommended --quiet --norestart
-```
-
-`--wait` is NOT a valid flag here; using it returns exit code 87 and bails without doing anything. Poll for the vs_installer process to exit instead.
-
 ## Build steps
 
 ```bash
@@ -94,8 +78,6 @@ cmake -B build_cmake_Game__Shipping__Win64 -G "Visual Studio 17 2022" -A x64
 cmake --build build_cmake_Game__Shipping__Win64 --config Game__Shipping__Win64
 ```
 
-First build takes about 4 to 5 minutes on a modest VM. Subsequent incremental builds are a few seconds.
-
 The build produces:
 - `<build>/Game__Shipping__Win64/bin/UE4SS.dll` (the runtime; you typically use the existing installed one)
 - `<build>/Game__Shipping__Win64/lib/UE4SS.lib` (the import library that cppmods link against)
@@ -105,17 +87,6 @@ The build produces:
 ## UEPseudo: the Epic-gated submodule
 
 The `deps/first/Unreal` submodule points to a private repo (`Re-UE4SS/UEPseudo`) that requires an Epic-Games-linked GitHub account to clone. This is the same access model Epic uses for the UnrealEngine repo itself.
-
-To get access:
-
-1. Sign up or log into an Epic Games account.
-2. Link your GitHub account at `https://www.unrealengine.com/en-US/ue-on-github`.
-3. Wait a few minutes for propagation.
-4. Verify by opening `https://github.com/Re-UE4SS/UEPseudo` in a browser while logged into the linked GitHub account.
-
-If the browser shows the repo, you have access. Then `gh auth setup-git` (or paste a GitHub PAT when git prompts) lets the submodule clone succeed.
-
-If the browser shows a 404 even after the linkage, the propagation hasn't completed; wait longer.
 
 ## Scaffolding a new C++ side mod
 
@@ -300,15 +271,15 @@ Most production mods stay pure Lua. New advanced features come in as C++ side mo
 
 ## Closing notes
 
-The toolchain has roughly 9 distinct gotchas to learn (Windows.h includes, fmt format width, deprecated header paths, StringType namespace, DLL kill sequence, on_update tick rate, ABI matching, UEPseudo Epic-link, the winget passive-install trap). Once they're in muscle memory, building a new C++ side mod is roughly:
+The toolchain has roughly 9 distinct gotchas to learn (Windows.h includes, fmt format width, deprecated header paths, StringType namespace, DLL kill sequence, on_update tick rate, ABI matching, the winget passive-install trap). Once they're in muscle memory, building a new C++ side mod is roughly:
 
-1. Make the directory and files (5 minutes).
+1. Make the directory and files .
 2. Add one line to `cppmods/CMakeLists.txt`.
-3. Reconfigure CMake (40 seconds).
-4. Build the target (10 seconds for an incremental).
+3. Reconfigure CMake .
+4. Build the target .
 5. Deploy DLL to `Mods/<name>/dlls/main.dll`.
 6. Restart server.
 
-A hello-world cppmod loaded live in a verified end-to-end test on a fresh toolchain in under 6 hours including all the initial dead-ends. Once the toolchain is up, subsequent mods are roughly half a day each plus whatever the feature work itself takes.
+A hello-world cppmod loaded live in a verified end-to-end test on a fresh toolchain including all the initial dead-ends. 
 
 The first session is the expensive one. After that, C++ side mods are routine.

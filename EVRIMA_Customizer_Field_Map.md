@@ -6,30 +6,33 @@ The customizer is interesting because the obvious approach (call `RequestRespawn
 
 ## What is FCustomizerDataBase
 
-`FCustomizerDataBase` is the USTRUCT that holds every visual customization for a player's dino. It contains:
+`FCustomizerDataBase` is the USTRUCT that holds every visual customization for a player's dino. Per `UHTHeaderDump-TheIsle/Public/CustomizerDataBase.h` it contains:
 
-- 7 `FLinearColor` fields for the color slots
+- 1 `bIsFemale` bool
 - 1 `SkinVariation` float (controls intra-skin variation effects)
 - 1 `PatternIndex` int (chooses the species' pattern)
+- 7 `FLinearColor` fields for the color slots (named below)
 - 1 `SkinCode` FString (the persistent skin name)
 
 The FString field is the trap. Naming `SkinCode` in Lua crashes UE4SS marshaling (rule 2). Naming any of the POD fields works fine.
 
 ## The 7 color fields
 
-Each color field is an `FLinearColor` with `R`, `G`, `B`, `A` floats in the 0.0 to 1.0 range. The field names on the struct, with the UI labels that map to them:
+Each color field is an `FLinearColor` with `R`, `G`, `B`, `A` floats in the 0.0 to 1.0 range. The field names on the struct (from `UHTHeaderDump-TheIsle/Public/CustomizerDataBase.h`), with the UI labels they map to:
 
 | Struct field | UI label | Notes |
 |---|---|---|
-| `BodyColor` | Body | Main body color |
-| `BackColor` | Back | Dorsal stripe / back |
-| `BellyColor` | Belly | Underbelly |
-| `AccentColor` | Accent | Stripes, spots, accent markings |
-| `PrimaryColor` | Primary | Secondary highlight (despite the name; "Primary" is the UI's "highlight" channel) |
-| `SecondaryColor` | Secondary | Tertiary highlight, often spots or claw color |
-| `PaintColor` | Paint | Stripes / paint overlay, often the brightest color in a skin |
+| `BodyColor` | body | Main body color |
+| `MarkingsColor` | pattern / markings | Pattern overlay (stripes, spots) |
+| `FlankColor` | sides / flank | Lateral / flank color |
+| `UnderbellyColor` | belly | Underbelly |
+| `Detail1Color` | detail | Accent / detail markings |
+| `EyesColor` | eyes | Eye color |
+| `MaleDisplayColor` | male display color / breed | Display color (most visible during courtship) |
 
-The UI labels do not match the struct field names cleanly. `PrimaryColor` is not the primary visible color; it's a secondary highlight slot. The mapping above was verified by setting each field to a known unique color value (e.g. pure red on `BackColor`, pure blue on `BellyColor`) and observing which part of the dino changed in the in-game customizer UI.
+The UI labels do not match the struct field names one-to-one. The mapping above was determined observationally by setting each field to a known unique color value (e.g. pure red on `MarkingsColor`, pure blue on `UnderbellyColor`) and watching which part of the dino changed in the customizer UI.
+
+Note: there is no `BackColor`, `AccentColor`, `PrimaryColor`, `SecondaryColor`, or `PaintColor` on this struct. Those are not real field names; assignments to them will silently no-op via UE4SS Lua's wrapper.
 
 ## Read pattern (verified)
 
@@ -47,13 +50,13 @@ local function readCustomizer(pawn)
     end
 
     return {
-        body      = readColor("BodyColor"),
-        back      = readColor("BackColor"),
-        belly     = readColor("BellyColor"),
-        accent    = readColor("AccentColor"),
-        primary   = readColor("PrimaryColor"),
-        secondary = readColor("SecondaryColor"),
-        paint     = readColor("PaintColor"),
+        body       = readColor("BodyColor"),
+        markings   = readColor("MarkingsColor"),
+        flank      = readColor("FlankColor"),
+        underbelly = readColor("UnderbellyColor"),
+        detail     = readColor("Detail1Color"),
+        eyes       = readColor("EyesColor"),
+        breed      = readColor("MaleDisplayColor"),
         skinVariation = cdata.SkinVariation,
         patternIndex = cdata.PatternIndex,
         -- DO NOT name SkinCode here. It's an FString and naming it crashes
@@ -82,20 +85,22 @@ local function applyCustomizer(pawn, colors)
         cdata[field].A = c.A or 1.0
     end
 
-    writeColor("BodyColor",      colors.body)
-    writeColor("BackColor",      colors.back)
-    writeColor("BellyColor",     colors.belly)
-    writeColor("AccentColor",    colors.accent)
-    writeColor("PrimaryColor",   colors.primary)
-    writeColor("SecondaryColor", colors.secondary)
-    writeColor("PaintColor",     colors.paint)
+    writeColor("BodyColor",        colors.body)
+    writeColor("MarkingsColor",    colors.markings)
+    writeColor("FlankColor",       colors.flank)
+    writeColor("UnderbellyColor",  colors.underbelly)
+    writeColor("Detail1Color",     colors.detail)
+    writeColor("EyesColor",        colors.eyes)
+    writeColor("MaleDisplayColor", colors.breed)
     -- Optional: skinVariation and patternIndex
     if colors.skinVariation ~= nil then cdata.SkinVariation = colors.skinVariation end
     if colors.patternIndex ~= nil then cdata.PatternIndex = colors.patternIndex end
 
-    -- Push the struct. The flag name and exact semantics of the second arg
-    -- vary by build; pass true for bForceReplication.
-    local ok = pcall(function() pawn:SetCustomizerData(cdata, true) end)
+    -- Push the struct via the single-arg setter. The UFunction signature is
+    -- `void SetCustomizerData(FCustomizerDataBase NewCustomizerData)` —
+    -- there is no bForceReplication arg. Replication happens via the
+    -- standard property path (OnRep_CustomizerData on the client).
+    local ok = pcall(function() pawn:SetCustomizerData(cdata) end)
     return ok
 end
 ```
@@ -153,6 +158,6 @@ The customizer read is also cheap. The auto-restore pattern reads the saved JSON
 
 ## Closing notes
 
-The customizer struct is one of the cleaner USTRUCTs in the EVRIMA codebase: 7 POD-ish color fields, two scalar fields, and one FString that you avoid naming. The mutate-and-replicate pattern works reliably. The only real gotcha is the pure-black sentinel issue, and that is one helper function.
+The customizer struct is one of the cleaner USTRUCTs in the EVRIMA codebase: 7 POD-ish color fields, two scalar fields (`SkinVariation` float, `PatternIndex` int), one bool (`bIsFemale`), and one FString (`SkinCode`) that you avoid naming. The mutate-and-replicate pattern works reliably. The only real gotcha is the pure-black sentinel issue, and that is one helper function.
 
 If you need to ship a feature that lets players customize their dino's colors via chat commands, the recipes above are everything you need. The full mod architecture (chat parsing, persistence, auto-restore on login) is documented in `EVRIMA_SkinMod_Architecture.md`.

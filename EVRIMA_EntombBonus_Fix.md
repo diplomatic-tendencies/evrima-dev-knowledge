@@ -120,7 +120,7 @@ If your mod has stored slots created before this patch, those JSON files do not 
 
 ### Stacks higher than 2
 
-The static template has Life 1 / Life 2 / Life 3 values. Setting `ElderReplicationStacks` to a value above 2 is not tested and may either clamp to 2 internally or produce undefined behavior. If your mod allows admin commands to manually set lineage depth, cap the value at 2 to be safe.
+The static template has Life 1 / Life 2 / Life 3 values. Setting `ElderReplicationStacks` to a value above 2 has not been tested yet .
 
 ### Multiple lineage chains via mating
 

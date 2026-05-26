@@ -6,28 +6,28 @@ If you're building any kind of admin command, state-restore feature, or quest-re
 
 ## The mechanism
 
-`FEligiblePrimeElder` is a USTRUCT with 11 fields. 10 of them are bool flags for individual prime conditions, plus one cached "eligible" bool that the engine recomputes from the 10 flags.
+`FEligiblePrimeElder` is a USTRUCT with 11 bool fields. Per `UHTHeaderDump-TheIsle/Public/EligiblePrimeElder.h`:
 
-The 10 condition fields, in order:
+- 10 condition flags named `bPrimeCondition1` through `bPrimeCondition10`
+- 1 cached output bool `bIsEligiblePrime`
 
-1. `bGrowthFinished` (set when growth hits 1.0)
-2. `bGrewUpInDifferentLocations` (visiting multiple zones during growth)
-3. `bSocialized` (group activities with other players)
-4. `bDrankFromMultipleSources` (varied water sources)
-5. `bAteVariety` (varied diet)
-6. `bDidNotInteractWithHumans` (no human contact during growth, on PvP variant only)
-7. `bSurvived` (reaching adulthood alive)
-8. `bRecovered` (recovering from injury, possibly health-related)
-9. `bEarnedFavor` (some kind of favor-grant trigger)
-10. `bUsedSpecialAbility` (using species-specific abilities)
+The engine does not expose human-readable names for the 10 condition slots; the public surface is just the numbered conditions. From live observation (flipping each condition one at a time and watching effects) the rough mapping is partial:
 
-The 11th field is the cached output bool, the one `GetIsEligiblePrimeElder()` returns to game code.
+| Slot | Observed objective | Stability |
+|---|---|---|
+| 1 | Visit sanctuary zone | per-life |
+| 3 | Perfect diet (≥1% carb + protein + lipid simultaneously) | per-life |
+| 7, 8, 10 | Breeding-path lifetime objectives | mostly persistent across respawn |
+| 9 | Earned per-life (some per-life objective) | resets on respawn |
+| 2, 4, 5, 6 | Never observed flipping | unknown / unimplemented |
 
-The engine's rule is roughly "if at least 5 of the 10 condition flags are true, set the cached eligible bool to true." The threshold check fires at specific gameplay moments: growth hitting 1.0, and some discrete events that re-evaluate prime eligibility.
+Treat the slot-to-objective mapping as observational; only `bPrimeConditionN` is canonical.
 
-Once eligible (5-of-10 threshold crossed), the cached bool gets locked in at the 75 percent growth mark. After that lock-in, the engine stops recomputing it from condition flags. This is what makes prime "stick" for a dino that earned it: the condition flags can later go stale or be overwritten, but the locked bool remains true.
+The engine's rule is roughly "if at least 5 of the 10 `bPrimeConditionN` flags are true, set `bIsEligiblePrime` to true." The threshold check fires at specific gameplay moments: growth hitting 1.0, and some discrete events that re-evaluate prime eligibility.
 
-For a dino that has not crossed the threshold, the cached bool is volatile. The engine recomputes it on every relevant tick. Setting the bool directly via `ServerSetPrimeEligible(true)` works for exactly one frame, then gets recomputed back to false from the 10 condition flags (most of which are false for a dino that hasn't actually earned prime).
+Once eligible (5-of-10 threshold crossed), the cached `bIsEligiblePrime` bool gets locked in at the 75 percent growth mark. After that lock-in, the engine stops recomputing it from the condition flags. This is what makes prime "stick" for a dino that earned it: the condition flags can later go stale or be overwritten, but the locked bool remains true.
+
+For a dino that has not crossed the threshold, `bIsEligiblePrime` is volatile. The engine recomputes it on every relevant tick. Setting the bool directly via `ServerSetPrimeEligible(true)` works for exactly one frame, then gets recomputed back to false from the 10 condition flags (most of which are false for a dino that hasn't actually earned prime).
 
 ## The naive approach that does not work
 
@@ -37,64 +37,66 @@ The interpretation that this was "the bool is read-only" or "the function is bro
 
 ## The recipe that works
 
-Force all 10 condition flags to true, force the cached eligible bool to true, and push the full struct via `SetEligiblePrimeElderData`. The engine sees all 10 flags as set (well above the 5-of-10 threshold), keeps the cached eligible bool true, and if the dino is at or past 75 percent growth, locks it in.
+Force all 10 condition flags to true, force the cached eligible bool to true, and push the full struct via `SetEligiblePrimeElderData`. The engine sees all 10 flags as set (well above the 5-of-10 threshold), keeps `bIsEligiblePrime` true, and if the dino is at or past 75 percent growth, locks it in.
 
 ```lua
 -- Force prime status by setting the full FEligiblePrimeElder struct.
 -- The naive ServerSetPrimeEligible(true) does NOT stick because the engine
--- recomputes the cached eligible bool from the 10 condition flags. Forcing
--- all 10 flags AND the cached bool together produces a state that the engine
+-- recomputes bIsEligiblePrime from the 10 condition flags. Forcing all 10
+-- flags AND the cached bool together produces a state that the engine
 -- accepts and locks in (at or past 75% growth).
 
 local function forcePrime(pawn)
     if pawn == nil then return false, "no-pawn" end
 
     -- Get the live struct. POD fields, safe to access by name.
+    -- (`pawn.EligiblePrimeElderData` direct field access also works.)
     local pe = pawn:GetEligiblePrimeElderData()
 
-    -- Set all 10 condition flags. The exact field names below match the
-    -- struct definition in the UHT dump.
-    pe.bGrowthFinished = true
-    pe.bGrewUpInDifferentLocations = true
-    pe.bSocialized = true
-    pe.bDrankFromMultipleSources = true
-    pe.bAteVariety = true
-    pe.bDidNotInteractWithHumans = true
-    pe.bSurvived = true
-    pe.bRecovered = true
-    pe.bEarnedFavor = true
-    pe.bUsedSpecialAbility = true
+    -- Set all 10 condition flags. Field names match the UHT dump exactly:
+    -- bPrimeCondition1..bPrimeCondition10.
+    pe.bPrimeCondition1  = true
+    pe.bPrimeCondition2  = true
+    pe.bPrimeCondition3  = true
+    pe.bPrimeCondition4  = true
+    pe.bPrimeCondition5  = true
+    pe.bPrimeCondition6  = true
+    pe.bPrimeCondition7  = true
+    pe.bPrimeCondition8  = true
+    pe.bPrimeCondition9  = true
+    pe.bPrimeCondition10 = true
 
-    -- Set the cached output bool.
-    pe.bIsEligiblePrimeElder = true
+    -- Set the cached output bool. Note: no trailing "Elder" — the dump's
+    -- field is bIsEligiblePrime.
+    pe.bIsEligiblePrime = true
 
-    -- Push the struct. No bForceReplication flag for this setter; the engine
+    -- Push the struct. Single-arg setter; no bForceReplication. Engine
     -- handles replication via the standard property system.
     local ok = pcall(function() pawn:SetEligiblePrimeElderData(pe) end)
     return ok
 end
 ```
 
-The `bDidNotInteractWithHumans` flag is interesting because on PvP-config servers this flag's meaning is roughly "did not encounter players during growth," which obviously is false for any player-controlled dino. Setting it to true anyway works; the engine's threshold check is just "at least 5 of these are true," it doesn't enforce any logical relationship between which 5.
+All 10 conditions set true is permissive overkill — the threshold is 5 — but covers any engine evaluation path including ones that might check subsets we haven't enumerated.
 
 ## Capture for round-trip
 
-For a state-restore mod, capture all 11 fields plus the cached bool. Restore via the recipe above. The capture is just field reads on the live struct, all POD.
+For a state-restore mod, capture all 11 fields. Restore via the recipe above. The capture is just field reads on the live struct, all POD.
 
 ```lua
 local pe = pawn:GetEligiblePrimeElderData()
 state.prime = {
-    isPrime = pe.bIsEligiblePrimeElder,
-    growthFinished = pe.bGrowthFinished,
-    multipleLocations = pe.bGrewUpInDifferentLocations,
-    socialized = pe.bSocialized,
-    drankFromMultipleSources = pe.bDrankFromMultipleSources,
-    ateVariety = pe.bAteVariety,
-    didNotInteractWithHumans = pe.bDidNotInteractWithHumans,
-    survived = pe.bSurvived,
-    recovered = pe.bRecovered,
-    earnedFavor = pe.bEarnedFavor,
-    usedSpecialAbility = pe.bUsedSpecialAbility,
+    isPrime = pe.bIsEligiblePrime,
+    cond1   = pe.bPrimeCondition1,
+    cond2   = pe.bPrimeCondition2,
+    cond3   = pe.bPrimeCondition3,
+    cond4   = pe.bPrimeCondition4,
+    cond5   = pe.bPrimeCondition5,
+    cond6   = pe.bPrimeCondition6,
+    cond7   = pe.bPrimeCondition7,
+    cond8   = pe.bPrimeCondition8,
+    cond9   = pe.bPrimeCondition9,
+    cond10  = pe.bPrimeCondition10,
 }
 ```
 
@@ -132,8 +134,8 @@ The `livePawnFromCtrl` helper is the rule-9a wrapper (filter for `pawn:GetAddres
 
 ## Closing notes
 
-The mistake to avoid is treating `bIsEligiblePrimeElder` as the source of truth. It is a cached output, recomputed from the 10 condition flags. Setting it alone is undone the next time the engine recomputes.
+The mistake to avoid is treating `bIsEligiblePrime` as the source of truth. It is a cached output, recomputed from the 10 `bPrimeCondition` flags. Setting it alone is undone the next time the engine recomputes.
 
 If your mod's purpose is to grant prime as a reward (quest completion, admin grant, paid perk), use the force-prime recipe. It is the only path that survives the engine's recomputation logic across all growth levels.
 
-If your mod's purpose is to capture and restore prime state without changing it, capture the full struct including all 10 condition flags, restore the full struct via `SetEligiblePrimeElderData`. The engine handles the rest.
+If your mod's purpose is to capture and restore prime state without changing it, capture the full struct including all 10 condition flags plus the cached bool, restore the full struct via `SetEligiblePrimeElderData`. The engine handles the rest.

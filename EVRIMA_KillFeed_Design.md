@@ -152,15 +152,3 @@ CREATE TABLE bonecoin_transactions (
 ```
 
 The unique constraint on `source_key` prevents double-credit even if the bot's in-memory idempotency check fails (e.g. after a restart with partial state).
-
-## Build estimate
-
-Lua v1: about 6 hours mod-side, 1-2 hours bot-side, 30 minutes for the DB migration. About a day end-to-end.
-
-C++ v2: about 1-2 days once the C++ toolchain is set up (see `EVRIMA_CPP_Side_Mods.md`). Most of the work is finding the right hook address; the actual hook logic is short. The toolchain bring-up itself is another half-day if you've never built a UE4SS C++ side mod before.
-
-## Closing notes
-
-The narrow spec ("direct-hit-within-20s only counts") was the key design decision. Without it, the kill feed would need to handle DoT chains, environmental deaths, and AI predation, all of which are not cleanly attributable from a pure-Lua mod. The narrow spec keeps Lua v1 feasible and ships in a day.
-
-The C++ v2 upgrade path is real if broader attribution is needed. It's not necessary for the narrow spec.

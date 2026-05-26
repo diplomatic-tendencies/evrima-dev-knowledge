@@ -32,34 +32,39 @@ These spawn cleanly (no crash), but the resulting actor is invisible and partial
 
 ## Animals
 
-The animal classes spawn cleanly and have working AI controllers. Useful for AI fauna spawners and for BodyDrop food sources.
+The animal classes spawn cleanly. Every species below has at least one working AI controller (verified live by ControllerProbe 2026-05-22) — see `EVRIMA_AI_Spawn_Pairs.md` for the full pairing catalog with movement deltas.
 
-| Species | Pawn class path | AI controller class path |
+| Species | Pawn class path | AI controller (one option) |
 |---|---|---|
+| Boar | `/Game/TheIsle/Core/Characters/Animals/Boar/BP_Boar.BP_Boar_C` | `/Script/TheIsle.TIAIBoarController` or BP wrapper |
+| Boar (baby) | `/Game/TheIsle/Core/Characters/Animals/Boar/BP_Boar_Baby.BP_Boar_Baby_C` | Same controller as adult Boar |
+| Chicken | `/Game/TheIsle/Core/Characters/Animals/Chicken/BP_Chicken.BP_Chicken_C` | `/Script/TheIsle.TIAIChickenController` or BP wrapper |
+| Crab | `/Game/TheIsle/Core/Characters/Animals/Crab/BP_Crab.BP_Crab_C` | `/Script/TheIsle.TIAICrabController` or BP wrapper |
 | Deer | `/Game/TheIsle/Core/Characters/Animals/Deer/BP_Deer.BP_Deer_C` | `/Game/.../BP_AI_Deer_Controller.BP_AI_Deer_Controller_C` |
-| Deer (baby) | `BP_Deer_Baby_C` | Same controller |
-| Boar | `BP_Boar_C` | `BP_AI_Boar_Controller_C` |
-| Boar (baby) | `BP_Boar_Baby_C` | Same controller |
-| Goat | `BP_Goat_C` | `BP_AI_Goat_Controller_C` |
-| Goat (baby) | `BP_Goat_Baby_C` | Same controller |
-| Chicken | `BP_Chicken.BP_Chicken_C` | No controller; spawns inert |
-| Rabbit | `BP_RabbitNew.BP_RabbitNew_C` | No controller; spawns inert |
-| Frog | `BP_Frog.BP_Frog_C` | No controller; spawns inert |
-| Sea Turtle | `BP_SeaTurtle.BP_SeaTurtle_C` | No controller; spawns inert |
-| Crab | `BP_Crab_new.BP_Crab_new_C` | No controller; spawns inert |
+| Deer (baby) | `/Game/TheIsle/Core/Characters/Animals/Deer/BP_Deer_Baby.BP_Deer_Baby_C` | `/Game/.../BP_AI_Deer_Baby_Controller.BP_AI_Deer_Baby_Controller_C` |
+| Goat | `/Game/TheIsle/Core/Characters/Animals/Goat/BP_goat.BP_Goat_C` | `/Script/TheIsle.TIAIGoatController` or BP wrapper |
+| Goat (baby) | `/Game/TheIsle/Core/Characters/Animals/Goat/BP_Goat_Baby.BP_Goat_Baby_C` | Same controller as adult Goat |
+| Rabbit | `/Game/TheIsle/Core/Characters/Animals/Rabbit/BP_Rabbit.BP_Rabbit_C` | `/Script/TheIsle.TIAIRabbitController` or BP wrapper |
+| Bullfrog | `/Game/TheIsle/Core/Characters/Animals/Bullfrog/BP_Bullfrog.BP_Bullfrog_C` | `/Script/TheIsle.TIAIFrogController` or BP wrapper |
+| Seaturtle | `/Game/TheIsle/Core/Characters/Animals/Seaturtle/BP_Seaturtle.BP_Seaturtle_C` | `/Script/TheIsle.TIAISeaturtleController` or BP wrapper |
 
-The "no controller" animals are part of the world's ambient population; they don't need to wander aggressively. They render correctly when spawned, just don't move much.
+Note: the case in the actual class names matters. `BP_Seaturtle.BP_Seaturtle_C` (lowercase t) not `BP_SeaTurtle`. The pawn class for the frog is `BP_Bullfrog`, not `BP_Frog`. The pawn class for the crab is `BP_Crab`, not `BP_Crab_new` (that's the *AnimBlueprint*). The pawn class for the rabbit is `BP_Rabbit`, not `BP_RabbitNew`. See `EVRIMA_AI_Spawn_Pairs.md` for verified pairings.
 
 ## Fish
 
+All under `/Game/TheIsle/Core/Characters/Fishes/` (note "Fishes", not "Fish"):
+
 | Species | Class path | Notes |
 |---|---|---|
-| Catfish (regular) | `/Game/TheIsle/Core/Characters/Fish/CatFish/BP_CatFish.BP_CatFish_C` | Spawns; AI requires water |
-| Catfish (elite) | `BP_Elite_Fish_CatFish_C` | Spawns; rare large variant |
-| Trout | `BP_Trout.BP_Trout_C` | Spawns; AI requires water |
-| Pike | `BP_Pike.BP_Pike_C` | Spawns; AI requires water |
+| Elite Catfish | `/Game/TheIsle/Core/Characters/Fishes/Catfish/BP_Elite_Fish_CatFish.BP_Elite_Fish_CatFish_C` | Spawns; AI needs water context (NO_BRAIN if on land) |
+| Elite Coelacanth | `/Game/TheIsle/Core/Characters/Fishes/Coelacanth/BP_Elite_Fish_Coelacanth.BP_Elite_Fish_Coelacanth_C` | Spawns; same water requirement |
+| School Catfish | `/Game/TheIsle/Core/Characters/Fishes/Schools/BP_Fish_Catfish.BP_Fish_Catfish_C` | School fish |
+| School Hoplosternum | `/Game/TheIsle/Core/Characters/Fishes/Schools/BP_Fish_Hoplosternum.BP_Fish_Hoplosternum_C` | School fish |
+| School Longear | `/Game/TheIsle/Core/Characters/Fishes/Schools/BP_Fish_Longear.BP_Fish_Longear_C` | School fish |
+| School MuskelLunge | `/Game/TheIsle/Core/Characters/Fishes/Schools/BP_Fish_MuskelLunge.BP_Fish_MuskelLunge_C` | School fish |
+| School RainbowFish | `/Game/TheIsle/Core/Characters/Fishes/Schools/BP_Fish_RainbowFish.BP_Fish_RainbowFish_C` | School fish |
 
-Fish AI is tied to water-presence checks. Spawning a fish on dry land produces an inert fish that flops briefly then dies. Spawn over a water area for working fish AI.
+Fish AI is tied to water-presence checks. ControllerProbe verified that spawning a fish on dry land produces a possessed-but-idle pawn (`NO_BRAIN`, movement delta = 0). Spawn over a water area for working fish AI. No `Trout` or `Pike` class exists in the EVRIMA build.
 
 ## Edible plants
 

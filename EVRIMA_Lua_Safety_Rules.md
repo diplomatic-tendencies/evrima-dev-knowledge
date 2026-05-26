@@ -29,7 +29,7 @@ This is the rule that took the longest to nail down. The naive version of the ru
 
 **Unsafe**: touching FString, pointer, or UObject* fields on a USTRUCT by name. Example offenders: `FCustomizerDataBase.SkinCode` (FString at offset 0x88), every FString field on `FTIPlayerData`, every FString field on `FTIEgg`. Reading or writing these specific fields crashes UE4SS marshaling. Naming the field is what trips the marshal, not just having the struct in scope.
 
-**Safe**: touching POD fields (FLinearColor, float, int, bool) on a struct that also contains an FString. For example, `cdata.BodyColor.R = 0.5` on `FCustomizerDataBase` works cleanly. You can read and write all eight FLinearColors on `FCustomizerDataBase`, plus the `SkinVariation` float and the `PatternIndex` int, as long as you never name `SkinCode` itself. Verified live by writing all eight color fields to fresh values over multiple iterations on the same pawn, with the server staying alive for hours afterward.
+**Safe**: touching POD fields (FLinearColor, float, int, bool) on a struct that also contains an FString. For example, `cdata.BodyColor.R = 0.5` on `FCustomizerDataBase` works cleanly. You can read and write all seven FLinearColors on `FCustomizerDataBase` (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`) plus the `SkinVariation` float and the `PatternIndex` int and the `bIsFemale` bool, as long as you never name `SkinCode` itself. Verified live by writing all seven color fields to fresh values over multiple iterations on the same pawn, with the server staying alive for hours afterward.
 
 **Unsafe**: writing Lua strings into FName fields. `liveStruct.MutationSlot1 = "Truculency"` crashes UE4SS marshaling at 0x70. Same crash for passing Lua strings to UFunctions that expect FName parameters.
 
@@ -57,7 +57,7 @@ Both candidate paths to "give me every connected player" are broken in different
 
 The fix is a per-mod self-maintained presence registry, fed by hooks. The full pattern is documented in `EVRIMA_Presence_Registry.md`. The short version: hook `/Script/TheIsle.TIPlayerController:SetAdminCred` (which fires once per controller on connect and again as a periodic heartbeat), maintain `online[steam] = { firstSeen, lastSeen }` in module scope, and run an active refresh tick every 15 seconds that re-derives controllers via `gm:GetControllerBySteamId(steam)` and evicts entries whose controller goes nil.
 
-Never cache the controller wrapper from any hook parameter. Re-derive it on every iteration via `gm:GetControllerBySteamId(steam)`. This is cheap and always returns a valid pointer for online steams.
+Never cache the controller wrapper from any hook parameter. Re-derive it on every iteration via `gm:GetControllerBySteamId(steam)`. This is cheap and always returns a valid pointer for online steams. if anyone knows a better way please add it here.
 
 ---
 
@@ -311,14 +311,6 @@ Call this only from a tick callback, never from inside a hook. The fresh `FindFi
 
 ---
 
-## EVRIMA HUD coordinate convention
-
-The in-game HUD displays coordinates as `(latitude, longitude, altitude)` which maps to `(engine Y, engine X, engine Z)`. So `pawn:K2_GetActorLocation()` returns `(engineX, engineY, engineZ)`, but the same position shown in the player's HUD has X and Y swapped.
-
-Always swap when accepting user-provided HUD coords or when displaying engine coords back to the user. Otherwise teleport commands send people to the wrong place and players assume your mod is broken.
-
----
-
 ## Chat hook signature
 
 `/Script/TheIsle.TIPlayerController:GetChatMessage(NewText, ChatPlayerController, ChatMode, NoFilterMsg)` is the hookable chat entrypoint.
@@ -361,22 +353,6 @@ The lesson from spending half a week chasing these: build a spy mod that hooks e
 
 Anywhere you want to react to a hook by calling something heavy (kill, notify, respawn, teleport), defer to a tick. The crash class is the same as `ClientShowNotification` from chat hook (rule 5). The pattern is shown in the rule-5 block above. The 3-second tick is a good default; drop to 1 second for tighter timing requirements.
 
----
-
-## HelloEvrima nests.json schema
-
-For any mod that needs to coexist with HelloEvrima (the nest persistence mod that most production servers use), it reads `Mods/HelloEvrima/Saved/nests.json` to enforce same-species respawn. Schema, with each nest on a single line:
-
-```json
-{"id":"<nest-code>", "ownerClassPath":"/Game/.../BP_Allosaurus_C",
- "maleSteamId":"76561198XXXXXXX", "femaleSteamId":"76561198XXXXXXX", ...}
-```
-
-`ownerClassPath` is the locked species; the "BlueprintGeneratedClass" prefix is already stripped.
-
-`maleSteamId` and `femaleSteamId` are co-owners; the species lock applies to both.
-
-HelloEvrima rewrites the file on its own observation cadence. Read on a 30-second-plus cycle to avoid hammering disk. Cheap dedup hash on `(updatedAtTick, nest count)`. The single-line-per-nest format lets you parse with a regex like `string.gmatch(body, "{[^{}]-}")`; this breaks if HelloEvrima ever pretty-prints, so guard with a JSON-decode fallback.
 
 ---
 

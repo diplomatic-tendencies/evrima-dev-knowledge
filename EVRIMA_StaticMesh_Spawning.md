@@ -98,11 +98,11 @@ Edible by carnivores. Physics-active so they fall and rest.
 
 ### Dino corpse decor
 
-Spawning a dino BP and immediately killing/ragdolling it produces a usable corpse mesh (see BodyDrop pattern for the full 6-step recipe). Cheaper than running live AI. 23 species available:
+Spawning a dino BP and immediately killing/ragdolling it produces a usable corpse mesh (see BodyDrop pattern for the full recipe). Cheaper than running live AI. The species set BodyDrop ships with:
 
 `/Game/TheIsle/Core/Characters/Dinosaurs/<Species>/BP_<Species>.BP_<Species>_C`
 
-Species: allosaurus, austroraptor, baryonyx, beipiaosaurus, carnotaurus, ceratosaurus, compsognathus, deinosuchus, diabloceratops, dilophosaurus, dryosaurus, gallimimus, herrerasaurus, hypsilophodon, maiasaura, omniraptor, pachycephalosaurus, pteranodon, stegosaurus, tenontosaurus, triceratops, troodon, tyrannosaurus.
+Species: allosaurus, beipiaosaurus, carnotaurus, ceratosaurus, compsognathus, deinosuchus, diabloceratops, dilophosaurus, dryosaurus, gallimimus, herrerasaurus, hypsilophodon, maiasaura, omniraptor, pachycephalosaurus, pteranodon, stegosaurus, tenontosaurus, triceratops, troodon, tyrannosaurus.
 
 ### Skeleton meshes (untested but probable)
 
