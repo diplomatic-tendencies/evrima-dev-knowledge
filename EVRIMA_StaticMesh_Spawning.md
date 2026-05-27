@@ -10,7 +10,7 @@ Short practical guide for spawning visible static meshes (decor, nests, gore, pl
 
 **DO this instead**: spawn a Blueprint class that has the mesh baked into its class default. "Spawn class X" replicates fine because the client already knows what mesh class X uses by name.
 
-This is what HelloEvrima does for nests, what BodyDrop does for corpses, what every working "spawn a thing" mod on EVRIMA does.
+This is what BodyDrop does for corpses, and what every working "spawn a thing" mod on EVRIMA does.
 
 ---
 
@@ -56,7 +56,7 @@ If `SpawnActor` fails (nullptr), retry with offset Z+1500 or scatter XY by a few
 
 All paths verified to exist on the EVRIMA build. Get the full path by appending `.BP_<Name>_C` to the file path.
 
-### Nests (HelloEvrima's territory)
+### Nests
 
 `/Game/TheIsle/Core/Nests/BP_Nest_*`, 11 variants:
 - `BP_Nest_Mound_Large_H` (large herbivore nest)

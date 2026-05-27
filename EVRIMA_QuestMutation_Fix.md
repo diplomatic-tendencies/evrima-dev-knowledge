@@ -100,7 +100,7 @@ end
 
 ### Restore phase: write the unlock list FIRST
 
-Before any mutation slot work, write the unlock list back to the pawn so the engine has the validation data in place:
+Before any mutation slot work, write the unlock list back to the pawn so the engine has the validation data in place. The live DinoStorage code actually performs this in TWO passes: once synchronously during the restore, and again ~250ms later as a defensive rewrite in case the first write didn't fully settle. The second pass is undocumented in older versions of this guide; it's worth adding to any new implementation that hits intermittent quest-mutation rejection.
 
 ```lua
 if state.unlockRequiredMutations ~= nil and #state.unlockRequiredMutations > 0 then

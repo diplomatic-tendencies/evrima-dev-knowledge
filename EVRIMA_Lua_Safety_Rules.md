@@ -137,7 +137,7 @@ The engine reads these files only at server boot. Disconnect and reconnect does 
 
 ## Rule 8: GAS attributes auto-refill when growth changes
 
-This one is subtle and produced more than one bug report from players. Hunger, Food, Thirst, Stamina, and Health are `FGameplayAttributeData` properties on the AttributeSet, replicated via `OnRep_*`. They are not plain floats. Every `SetGrowth(N)` call recomputes the maximum value for each of these attributes and refills the current value to the new max.
+This one is subtle and produced more than one bug report from players. Hunger, `FoodValue`, Thirst, Stamina, and Health are `FGameplayAttributeData` properties on the AttributeSet, replicated via `OnRep_*`. They are not plain floats. (Note: the underlying engine field is `FoodValue`, not `Food`, even though common helper names use `food`.) Every `SetGrowth(N)` call recomputes the maximum value for each of these attributes and refills the current value to the new max.
 
 The practical consequence: if you `SetThirst(455)` then later `SetGrowth(0.5)` to apply a growth change, Thirst gets wiped to MaxThirst (which is recomputed from the new growth). Your set is undone.
 

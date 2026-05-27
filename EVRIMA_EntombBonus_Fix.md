@@ -120,7 +120,9 @@ If your mod has stored slots created before this patch, those JSON files do not 
 
 ### Stacks higher than 2
 
-The static template has Life 1 / Life 2 / Life 3 values. Setting `ElderReplicationStacks` to a value above 2 has not been tested yet .
+The static template has Life 1 / Life 2 / Life 3 values. Setting `ElderReplicationStacks` to a value above 2 has not been tested yet — the engine may clamp internally, may extend a hidden Life 4+ template, or may produce undefined behavior. Verified clean values are 0, 1, 2.
+
+The MutationDepthProbe `Saved/dump.txt` contains the round-trip evidence for 0/1/2 stacks producing 0.05/0.10/0.15 effective values for Truculency.
 
 ### Multiple lineage chains via mating
 
@@ -134,7 +136,7 @@ The 16 slot fields include `ElderMutationSlot*A` and `ElderMutationSlot*B`. The 
 
 If your mod or its consumers (a bot, a website, an in-game UI display) needs to look up effective mutation values from outside the engine's normal flow, use `pawn:IsLifecycleMutationEquipped(FName(name))`. It returns a float that is the actual effective value the engine uses for gameplay. Returns 0 if the mutation is not in any slot. Returns the appropriate `EffectValueLifeN` if it is.
 
-## Why DinoStorage and similar mods missed this
+## Why DinoStorage missed this
 
 The engine's mutation system is split across two data sources, with the slot data on the pawn (`ReplicatedMutationsData`) and the tier counter as a sibling int property on the same pawn (`ElderReplicationStacks`). They are not in the same struct. A mod that focused on the visible slot data is easy to write without noticing the counter exists. The struct contains 16 FName slot fields plus 7 stat-adder floats and a bool, all related to mutation gameplay, so it looks complete.
 

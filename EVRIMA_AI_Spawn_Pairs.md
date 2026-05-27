@@ -27,9 +27,10 @@ Default spawn growth is hatchling (~0.05). For adult AI:
 ```lua
 pawn:SetGrowth(1.0)
 pawn:SetHealth(pawn:GetMaxHealth())
-pawn:SetFood(pawn:GetMaxFood())
+pawn:SetFood(pawn:GetMaxFoodValue())
 pawn:SetThirst(pawn:GetMaxThirst())
--- Note: SetGrowth wipes vitals to max, so call vital setters AFTER SetGrowth
+-- Note: SetGrowth wipes vitals to max, so call vital setters AFTER SetGrowth.
+-- The food getter is GetMaxFoodValue (not GetMaxFood). Field is FoodValue per UHT.
 ```
 
 ---
@@ -77,6 +78,8 @@ These use the Blueprint-wrapped controllers. Equivalent to native versions where
 | Psittacosaurus (Plains) | `/Game/TheIsle/Core/Characters/Dinosaurs/Psittacosaurus/BP_Psittacosaurus_Plains.BP_Psittacosaurus_Plains_C` | `/Game/TheIsle/Core/AI/Controllers/Dinos/BP_AI_Psittacosaurus_Controller.BP_AI_Psittacosaurus_Controller_C` |
 
 ## Cross-species pairs, for species with no dedicated AI controller
+
+Some playable / cut-content species don't have their own dedicated AI controller. Pairing them with a physiologically-similar species' controller produces working AI — the behavior tree uses TICharacterBase APIs that all dinos share, so the borrowed brain drives the new pawn reasonably (verified in-game: a Triceratops with a Diabloceratops controller fled correctly from a player Trex).
 
 | Species | Pawn class | Borrowed controller |
 |---|---|---|

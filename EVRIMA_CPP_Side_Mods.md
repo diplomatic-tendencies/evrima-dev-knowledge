@@ -271,15 +271,15 @@ Most production mods stay pure Lua. New advanced features come in as C++ side mo
 
 ## Closing notes
 
-The toolchain has roughly 9 distinct gotchas to learn (Windows.h includes, fmt format width, deprecated header paths, StringType namespace, DLL kill sequence, on_update tick rate, ABI matching, the winget passive-install trap). Once they're in muscle memory, building a new C++ side mod is roughly:
+The toolchain has roughly 8 distinct gotchas to learn (Windows.h `WIN32_LEAN_AND_MEAN`/`NOMINMAX` includes, fmt-format wide-string format width, deprecated header paths, `StringType` namespace, DLL kill sequence for both server processes, on_update tick rate, ABI matching, and the VS 2022 winget-passive-install trap). Once they're in muscle memory, building a new C++ side mod is roughly:
 
-1. Make the directory and files .
+1. Make the directory and files.
 2. Add one line to `cppmods/CMakeLists.txt`.
-3. Reconfigure CMake .
-4. Build the target .
+3. Reconfigure CMake.
+4. Build the target.
 5. Deploy DLL to `Mods/<name>/dlls/main.dll`.
 6. Restart server.
 
-A hello-world cppmod loaded live in a verified end-to-end test on a fresh toolchain including all the initial dead-ends. 
+The first session is the expensive one — bringing up the toolchain end-to-end takes most of a working day. After that, individual C++ side mods are routine.
 
-The first session is the expensive one. After that, C++ side mods are routine.
+Live KillFeedMod build (verified mid-2026) progressed from `v0.1.0-hello-world` to `v0.5.1-target-extraction` over a handful of sessions, with the live UE4SS.log showing `[KillFeedMod] hook installed: pre_id=1 post_id=2` after each boot — the `ApplyDamage` UFunction hook is live and functioning.

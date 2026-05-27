@@ -18,9 +18,9 @@ The "allows foreign DLLs at proxy slot" point is what makes client UE4SS theoret
 
 ## UE4SS on Wine (Linux) does not work
 
-Despite EAC allowing the proxy DLL slot, UE4SS specifically fails on Wine. The failure is an upstream bug in UE4SS's `dwmapi.dll` proxy initialization that produces an access violation in `DllMain` on Wine. This is not an EVRIMA-specific issue; the same bug hits other UE-modded games on Wine.
+Despite EAC allowing the proxy DLL slot, UE4SS specifically fails on Wine. The failure is an upstream bug in UE4SS's `dwmapi.dll` proxy initialization that produces an access violation in `DllMain` on Wine — verified live 2026-05-21 (Wine's stub `dwmapi` reached the main menu cleanly; UE4SS's `dwmapi` AV'd in `DllMain` before the menu). This is not an EVRIMA-specific issue; the bug is in UE4SS's Windows-native operations that don't translate cleanly through Wine's Win32 emulation.
 
-Until upstream fixes this (the bug has been documented in the UE4SS issue tracker), client-side UE4SS Lua mods are Windows-only.
+Until upstream fixes this, client-side UE4SS Lua mods are Windows-only.
 
 ## VM detection blocks the client
 
@@ -70,4 +70,3 @@ A `.pak` plus a small C++ side mod that spawns instances of the new classes is t
 
 EVRIMA's modding surface is asymmetric: the dedicated server is heavily moddable (UE4SS works fully, no EAC, plenty of UFunction surface), but the client is locked down by EAC. The right strategy is to put as much logic server-side as possible (state, persistence, events, scoring), and use `.pak` content for the client-side parts that need to render visual content.
 
-Server-side mods are the low-friction path; that's where most modding effort productively goes. Client `.pak` content is the higher-effort path for new visuals. Client-side scripted features (the equivalent of UE4SS Lua but on the client) are not feasible on EVRIMA in 2026.
