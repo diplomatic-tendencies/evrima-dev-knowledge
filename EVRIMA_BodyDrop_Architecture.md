@@ -94,35 +94,35 @@ BodyDrop's verified species catalog. All under `/Game/TheIsle/Core/Characters/Di
 | Troodon | `/Game/TheIsle/Core/Characters/Dinosaurs/Troodon/BP_Troodon.BP_Troodon_C` |
 | Tyrannosaurus | `/Game/TheIsle/Core/Characters/Dinosaurs/Tyrannosaurus/BP_Tyrannosaurus.BP_Tyrannosaurus_C` |
 
-Other classes (Pterodactylus, Psittacosaurus biome variants) also spawn — see `EVRIMA_Spawnable_Actors.md` and `EVRIMA_AI_Spawn_Pairs.md` for the full pawn catalog. BodyDrop's table above is the subset the mod ships with as corpse options.
+Other classes (Pterodactylus, Psittacosaurus biome variants) also spawn — see `EVRIMA_AI_Spawn_Pairs.md` for the full pawn catalog. BodyDrop's table above is the subset the mod ships with as corpse options.
 
 Animal species (Deer, Boar, Goat, etc.) also work with the same recipe using paths under `/Game/TheIsle/Core/Characters/Animals/`. The full animal class list is in `EVRIMA_Spawnable_Actors.md`.
 
 The visual is identical to a real-player-killed corpse of the same species. The food value matches what an adult of that species would yield. Players can eat these corpses normally.
 
-## Filter system
+## Filter system (anchor-eligibility)
 
-BodyDrop v002 adds a filter system to gate spawns by admin permission and prevent spam. The filter logic runs before the spawn:
+BodyDrop v002 adds an anchor-eligibility filter system. "Anchors" are the live players the spawn loop radiates corpses around. The filters gate WHICH players the spawn loop services, not WHO can call the commands.
 
-```lua
-local function checkSpawnAllowed(callerSteam, species, growth)
-    if not isAdminOrAllowed(callerSteam) then
-        return false, "not-allowed"
-    end
-    if rateLimit[callerSteam] and (os.time() - rateLimit[callerSteam]) < 5 then
-        return false, "rate-limit"
-    end
-    if growth < 0.1 or growth > 1.0 then
-        return false, "growth-out-of-range"
-    end
-    if not isValidSpecies(species) then
-        return false, "unknown-species"
-    end
-    return true
-end
-```
+Real config knobs (defaults from `BodyDrop\Scripts\main.lua`; many production deployments override via `Saved/config.json`):
 
-The rate limit is per-caller, not global. The growth range prevents hatchling-sized corpse spam . The species validation rejects typos before they reach the spawn API.
+| Knob | Source default | Effect |
+|---|---|---|
+| `growthFilterEnabled` | false | When true, skip anchors above `maxGrowthPercent` |
+| `maxGrowthPercent` | 70 | Threshold for the growth filter (anchors must be smaller than this to qualify) |
+| `hungerFilterEnabled` | false | When true, skip anchors whose hunger is below `maxHungerPercent` (i.e. only spawn for hungry players) |
+| `maxHungerPercent` | 15 | Hunger threshold (in HUD-percent terms) |
+| `spawnForHerbivores` | true | When false, herbivore anchors are skipped |
+| `excludeSameSpeciesAsAnchor` | false | When true, the spawned corpse won't be the same species as the anchor player |
+| `groupPolicy` | `"individual"` | One of `individual` / `per_group` / `solo_only` — see GroupId-aware spawning |
+
+Production servers typically tighten these — e.g. dev server config currently runs with `growthFilterEnabled=true`, `hungerFilterEnabled=true`, `excludeSameSpeciesAsAnchor=true`. Check your `Saved/config.json` to see runtime values.
+
+Skip-log signature (in UE4SS.log): `[BodyDrop] Spawn tick skipped: no eligible anchors (filtered: N well-fed)`
+
+The filters apply per-tick; each tick the spawn loop builds the eligible-anchor list, picks an anchor, picks a species (excluding the anchor's species if configured), and spawns one corpse at a scatter offset around that anchor.
+
+There is no per-caller rate limit on the inbox / chat command surface itself — the rate-limiting is the spawn loop's own tick interval.
 
 ## Performance notes
 
@@ -130,8 +130,19 @@ A single corpse spawn takes about 20 to 40 milliseconds on the test rig. Most of
 
 The engine's corpse decay reclaims the actor automatically. No mod-side cleanup is needed. This is the key reason BodyDrop is safe and most other actor-spawning patterns are not: BodyDrop never holds references to spawned actors past the spawn call, so there's no chance of touching a freed actor (safety rule 9b).
 
+## Other mod surfaces
+
+In addition to the spawn-loop + recipe primitive, BodyDrop exposes:
+
+- **Chat command surface**: `!bd` / `!bodydrop` with subcommands like `diag`, `status`, `set interval N`, `set <filter> <on/off>`, etc.
+- **CommandBridge inbox handler**: tails `Mods/BodyDrop/Saved/inbox.ndjson` accepting the same token-array commands. Routed via CommandBridge's `bd`/`bodydrop` verb.
+- **NDJSON events emitter**: `Mods/BodyDrop/Saved/events.ndjson` for downstream tracking of every spawned corpse (steam of anchor, species, location, ts).
+- **Group-aware spawning**: when `groupPolicy=per_group`, the spawn loop counts each `TICharacterBase.GroupId` only once per tick (so a group of 4 friends gets 1 corpse allocation, not 4); `solo_only` excludes any player who shares a GroupId with another connected player.
+
+See the CommandBridge architecture doc for how the inbox routing wires up.
+
 ## Closing notes
 
-The recipe above is everything required. There is no extra setup, no controller construction, no possession. The engine handles the rest **once all the corpse-state flags are written in the right order** — `SetHealth(0)` alone is not enough.
+The recipe above is everything required for the spawn primitive. There is no extra setup, no controller construction, no possession. The engine handles the corpse lifecycle **once all the corpse-state flags are written in the right order** — `SetHealth(0)` alone is not enough.
 
 If your mod uses this pattern, do not store the returned pawn pointer for later use. The engine's corpse decay will destroy it on its own schedule. Lua-side cleanup via `K2_DestroyActor` on a stored pointer will crash the server (safety rule 9b).

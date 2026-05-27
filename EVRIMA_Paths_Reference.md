@@ -142,30 +142,49 @@ The port is the game traffic port. Default 7777; many servers use 7778 to avoid 
 
 ## Game.ini relevant keys
 
-The `Saved/Config/WindowsServer/Game.ini` overrides the defaults shipped with the game. Common keys:
+The `Saved/Config/WindowsServer/Game.ini` overrides the defaults shipped with the game. Real sections + keys (verified against a live dev server):
 
 ```ini
 [/Script/TheIsle.TIGameStateBase]
 AdminsSteamIDs=76561198XXXXXXX,76561198YYYYYYY
 
-[/Script/TheIsle.TIGameModeBase]
-GameRules=Survival
-ServerPassword=secret  # if you want a password gate
+[/Script/TheIsle.TIGameSession]
+ServerName=My EVRIMA Server
+MaxPlayerCount=120
+MapName=Gateway
+bServerPassword=False
+ServerPassword=
+bRconEnabled=True
+RconPassword=<your-rcon-password>
+RconPort=8888
 ```
 
-The `AdminsSteamIDs` list is what the `SetAdminCred` heartbeat's bool parameter reflects. Adding a steam to this list and rebooting causes that player's `SetAdminCred` to fire with `bool=true`.
+The `AdminsSteamIDs` list (on `TIGameStateBase`) is what the `SetAdminCred` heartbeat's bool parameter reflects. Adding a steam to this list and rebooting causes that player's `SetAdminCred` to fire with `bool=true`.
+
+RCON, password, server name, map, slot count all live under `[/Script/TheIsle.TIGameSession]`. There is no `[/Script/TheIsle.TIGameModeBase]` section in real Game.ini files; references elsewhere to keys like `GameRules=Survival` are fabricated.
+
+The third section that commonly appears is `[/Script/Engine.Game]` for the underlying UE Game class — used for the global RCON enable/port/password as Engine-level overrides:
+
+```ini
+[/Script/Engine.Game]
+RconEnabled=True
+RconPassword=<your-rcon-password>
+RconPort=8888
+```
+
+Some deployments duplicate the RCON config across both `[/Script/TheIsle.TIGameSession]` and `[/Script/Engine.Game]`. The `bRconEnabled`/`RconPassword`/`RconPort` keys under `[/Script/TheIsle.TIGameSession]` are the canonical ones for the EVRIMA-side RCON; the `[/Script/Engine.Game]` variants are the engine's stock UE keys, sometimes seen on older configs.
 
 ## Mod file size budget
 
-For reference, the production mods this knowledge bundle describes have these rough sizes:
+For reference, the production mods this knowledge bundle describes have these rough sizes (live mid-2026):
 
 | Mod | Lua source | Saved data |
 |---|---|---|
-| DinoStorage | About 2000 lines | Per-player JSON files, typically 4-10 KB each |
-| BodyDrop | About 400 lines | None (stateless) |
-| SkinMod | About 400 lines | Per-player JSON files, 500 bytes each |
-| PlayerStats | About 200 lines | events.ndjson, grows over time, rotate daily |
-| CommandBridge | About 500 lines | Inbox + results NDJSON, rotate daily |
+| DinoStorage | ~2640 lines | Per-player per-slot JSON, typically 4-10 KB each |
+| BodyDrop | ~1630 lines | events.ndjson + inbox.ndjson (stateless otherwise) |
+| PlayerStats | ~930 lines | events.ndjson with built-in rotation (50 MB / 24 h) |
+| SkinMod | ~920 lines | Per-player JSON files, ~500 bytes each |
+| CommandBridge | ~850 lines | commands.ndjson (input) + results.ndjson (output) |
 
 UE4SS mods are not size-constrained in practice. Lua source files of 10000 lines load fine. The bottleneck (if any) is per-tick work, not source size.
 

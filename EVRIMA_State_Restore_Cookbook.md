@@ -48,22 +48,26 @@ pawn:SetMaxHunger(state.maxHunger)  -- and the other maxes
 pawn:SetHealth(state.health)        -- and the rest of the vitals
 pawn:ServerSetPrimeEligible(state.isPrime)  -- volatile, see step 5
 
--- Step 2: staged mutation slot apply
--- The engine validates "is this slot in its choice window?" at SetSlot-call time.
--- Mutation slots unlock at growth thresholds of roughly 26 percent, 50 percent,
--- 75 percent, and 75 percent for the prime-only slot 4. Calling all four slot
--- setters at the final adult growth value applies only the LAST one; earlier
--- calls get rejected silently. The fix is to reset growth to zero, ramp it back
--- up through each unlock threshold, set the slot at each threshold, then
--- restore the final growth value. Use thresholds slightly above the unlock
--- points (slot 1 unlocks around 26 percent, not exactly 25):
+-- Step 2: active mutation slots via FIELD-WRITE (the v021+ way)
+-- The legacy approach was a SetGrowth ramp + per-slot SetSlotNEquippedMutation
+-- calls at each unlock threshold (~26/50/75/75 percent). That approach has
+-- multiple silent-rejection edge cases (batching, quest-mutation validation
+-- gates, post-bulk-state settle requirements) that bit DinoStorage twice.
+-- See EVRIMA_QuestMutation_Fix.md for the full debugging story.
+--
+-- The v021+ pattern bypasses SetSlotN entirely. Write the FName directly into
+-- the live ReplicatedMutationsData struct, push via SetReplicatedMutationsData,
+-- and defer ~500ms after bulk state writes. This bypasses the batching limit,
+-- the quest-mutation validation gate, and the settle requirement all at once.
 
-pawn:SetGrowth(0.0)
-if Slot1 then pawn:SetGrowth(0.30); pawn:SetSlot1EquippedMutation(FName(Slot1)) end
-if Slot2 then pawn:SetGrowth(0.55); pawn:SetSlot2EquippedMutation(FName(Slot2)) end
-if Slot3 then pawn:SetGrowth(0.80); pawn:SetSlot3EquippedMutation(FName(Slot3)) end
-if Slot4 then pawn:SetGrowth(0.80); pawn:SetSlot4EquippedMutation(FName(Slot4)) end
-pawn:SetGrowth(state.growth)
+LoopInGameThreadWithDelay(500, function()  -- ~500ms after the rest of the apply
+    local liveMut = pawn.ReplicatedMutationsData
+    if Slot1 then liveMut.MutationSlot1 = FName(Slot1) end
+    if Slot2 then liveMut.MutationSlot2 = FName(Slot2) end
+    if Slot3 then liveMut.MutationSlot3 = FName(Slot3) end
+    if Slot4 then liveMut.MutationSlot4 = FName(Slot4) end
+    pawn:SetReplicatedMutationsData(liveMut, true)  -- bForceReplication=true
+end)
 
 -- Step 3: parent and elder slots (no per-slot UFunction setters exist)
 -- Field-write on the live struct using FName(s) userdata, then push via the
@@ -87,9 +91,14 @@ pawn:SetNutrientsStruct(live, true)
 
 -- Step 5: re-apply GAS-attribute vitals AFTER mutation staging
 -- Thirst, Hunger, Food, Stamina, Health are FGameplayAttributeData. Each
--- SetGrowth call in step 2 wiped them by recomputing max-stats and refilling
--- current to the new max. Re-set them now that no more SetGrowth calls will
--- run during this restore.
+-- SetGrowth call earlier in the apply wiped them by recomputing max-stats and
+-- refilling current to the new max. Re-set them now that no more SetGrowth
+-- calls will run during this restore.
+--
+-- Note: the live mod actually re-applies vitals TWICE — once inside the
+-- +500ms deferred mutation block (step 2 above) and once at the very end of
+-- applyPawnState. The deferred apply is defensive against late-arriving
+-- growth changes; the end-of-apply pass is the canonical one.
 
 pawn:SetMaxHunger(state.maxHunger)  -- and the other maxes
 pawn:SetHealth(state.health)         -- and the rest of the vitals
@@ -150,11 +159,9 @@ Gender cannot be restored. No `SetIsFemale` UFunction exists. Capture for warnin
 
 WaterLevel is capture-only. `GetWaterLevel()` exists; no `SetWaterLevel`. It gets restored to whatever the species default is on respawn.
 
-If your server runs HelloEvrima (nest persistence) alongside your state-restore mod, expect this interaction. HelloEvrima tracks the dino class via a `SetDinosaurOwner` hook. After `!store` kills the live dino, HelloEvrima's nest persistence loop spams "DUMPNEST invalid actor" or "NestRestore" retry messages until the player respawns. This is cosmetic noise, not breakage. The dino class on the nest may show as the previous species after a cross-species respawn; HelloEvrima reconciles this on its own cadence.
-
 Cross-species redemption (stored Triceratops, redeem as Allosaurus) breaks the nest visual because the engine cleans up species-mismatched nest meshes. The gameplay den still works (DenAura fires correctly), but the mesh disappears. The clean answer is to only allow same-species redemption. The hack answer is to warn the user and let them deal with the visual.
 
-Cross-species redemption can also crash HelloEvrima itself when the JSON-saved owner class differs from the live char class at the K2_PostLogin moment. Keep stored class and redemption class in sync to avoid the `0xffffffffffffffff` AV that HelloEvrima's restore can hit in that edge case.
+If a coexisting nest-persistence mod stores the owner class in its own JSON and reads it at `K2_PostLogin`, a cross-species mismatch between the stored class and the live char class can crash that mod (we've seen `0xffffffffffffffff` AVs in this case). Keep stored class and redemption class in sync to avoid the edge case.
 
 Storage JSON schema rule of thumb: include a `version` field from day one. You will change the schema at least twice. Write all fields with sensible defaults so older saves still load. Use a flat top-level structure plus nested `nutrients` and `mutations` objects. Two-level nesting is the right balance for grep-ability and forward compatibility.
 

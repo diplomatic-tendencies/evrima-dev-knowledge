@@ -107,25 +107,31 @@ end
 
 The pattern is: get the live struct, mutate POD fields by name, pass the same struct wrapper back via the setter. The engine handles replication to the client. The skin updates within a frame or two.
 
-## The pure-black gotcha
+## The pure-black gotcha (folklore, partial verification)
 
-The customizer has a subtle bug where pure black `FLinearColor(0, 0, 0)` does not always render correctly. The engine appears to treat pure-zero as "unset" in some replication paths, so a player who set every color to pure black would see a partially-default dino on respawn or relog.
+There's a long-standing claim that pure black `FLinearColor(0, 0, 0)` doesn't always render correctly — that the engine treats pure-zero as "unset" in some replication paths and a player who set every color to pure black would see a partially-default dino on respawn or relog.
 
-The workaround is to bump any pure-zero channel up by a tiny amount (0.01 is enough to be invisible but defeats the sentinel check):
+The live SkinMod guards against this with an inline check **at apply time** (NOT at save time — the saved file is allowed to contain `(0, 0, 0)` faithfully):
 
 ```lua
-local function bumpPureBlack(c)
-    if c == nil then return nil end
-    return {
-        R = (c.R == 0.0) and 0.01 or c.R,
-        G = (c.G == 0.0) and 0.01 or c.G,
-        B = (c.B == 0.0) and 0.01 or c.B,
-        A = c.A or 1.0,
-    }
-end
+-- Inside applySkin, right before writing each color field:
+if r == 0 and g == 0 and b == 0 then r, g, b = 0.01, 0.01, 0.01 end
+cdata[fieldName].R = r
+cdata[fieldName].G = g
+cdata[fieldName].B = b
+cdata[fieldName].A = 1.0
 ```
 
-Run this on every color before the write. The visual difference between 0.0 and 0.01 is imperceptible in-game; the difference between "displays" and "vanishes on relog" is everything.
+Two important details:
+
+1. The bump triggers only when **all three** RGB channels are zero, not per-channel. `(0, 0.5, 0)` is left alone.
+2. The bump happens at apply time, not save time. The on-disk skin file (`Mods/SkinMod/Saved/skins/<steam>.json`) may contain pure `(0, 0, 0)` values; the bump is applied when those values flow into a SetCustomizerData call.
+
+The visual difference between 0.0 and 0.01 is imperceptible in-game; the difference between "displays correctly" and "shows debug pattern" — if the sentinel bug is real — is everything.
+
+**Note**: this is folklore-level verification. SkinProbe has no test for the bug specifically. Live observation 2026-05-26 with `detail1=(0,0,0)` rendered fine, suggesting the bug may not affect every field, or may only trigger on relog rather than during normal play. The bump is cheap insurance regardless, and production SkinMod keeps it.
+
+Single-field `SetCustomizerData(cdata)` writes DO replicate visibly to the client — verified live 2026-05-26 (body color changed from blue to green via SkinMod chat command; verified visually in-game). The doc's earlier claim that the engine handles replication via the standard property path holds.
 
 ## Pattern index and skin variation
 

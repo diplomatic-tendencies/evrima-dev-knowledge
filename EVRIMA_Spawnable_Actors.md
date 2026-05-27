@@ -2,9 +2,9 @@
 
 This is a catalog of what spawns cleanly via `world:SpawnActor` server-side on The Isle EVRIMA, what doesn't, and why. The dinosaur and animal AI pairs are covered separately in `EVRIMA_AI_Spawn_Pairs.md`; this doc is everything else (cut-content species, VFX, fish, edible plants, gore items, world props).
 
-## Cut-content dinosaur species
+## Spawnable dinosaur species (BP catalog)
 
-These have BP class entries in the game and spawn fine, but are not in the live spawn rotation as playable species. They are useful as set dressing, food sources (for BodyDrop), or AI fauna (with the cross-controller pairings in `EVRIMA_AI_Spawn_Pairs.md`).
+These all have working BP class entries that spawn cleanly via `world:SpawnActor`. Most are in the standard playable roster on servers that allow them via Game.ini `[/Script/TheIsle.TIGameStateBase] AllowedClasses=`; a handful (Pterodactylus, Psittacosaurus biome variants) are mainly used as set dressing or AI fauna. Useful for BodyDrop food sources, AI Spawner pairings (see `EVRIMA_AI_Spawn_Pairs.md`), and scripted scenarios.
 
 | Species | Class path | Status |
 |---|---|---|
@@ -18,6 +18,10 @@ These have BP class entries in the game and spawn fine, but are not in the live 
 | Dryosaurus | `/Game/TheIsle/Core/Characters/Dinosaurs/Dryosaurus/BP_Dryosaurus.BP_Dryosaurus_C` | Full mesh, has AI controller |
 | Beipiaosaurus | `/Game/TheIsle/Core/Characters/Dinosaurs/Beipiaosaurus/BP_Beipiaosaurus.BP_Beipiaosaurus_C` | Full mesh, no AI controller |
 | Troodon | `/Game/TheIsle/Core/Characters/Dinosaurs/Troodon/BP_Troodon.BP_Troodon_C` | Full mesh, no AI controller |
+| Pterodactylus | `/Game/TheIsle/Core/Characters/Dinosaurs/Pterodactylus/BP_Pterodactylus.BP_Pterodactylus_C` | Full mesh, BP AI controller exists |
+| Psittacosaurus (Coastal) | `/Game/TheIsle/Core/Characters/Dinosaurs/Psittacosaurus/BP_Psittacosaurus_Coastal.BP_Psittacosaurus_Coastal_C` | Full mesh, has AI controller |
+| Psittacosaurus (Highlands) | `/Game/TheIsle/Core/Characters/Dinosaurs/Psittacosaurus/BP_Psittacosaurus_Highlands.BP_Psittacosaurus_Highlands_C` | Full mesh, has AI controller |
+| Psittacosaurus (Plains) | `/Game/TheIsle/Core/Characters/Dinosaurs/Psittacosaurus/BP_Psittacosaurus_Plains.BP_Psittacosaurus_Plains_C` | Full mesh, has AI controller |
 
 The "no AI controller" entries can be paired with a similar-physiology controller from another species. Triceratops driven by Diabloceratops AI works (the behavior tree uses TICharacterBase APIs that all dinos share). Cross-controller pairings are in `EVRIMA_AI_Spawn_Pairs.md`.
 
@@ -93,10 +97,11 @@ Visual effect actors mostly spawn cleanly on the server side, but only one rende
 
 | Effect | Class path | Renders? |
 |---|---|---|
-| Halluc Fog | `/Game/TheIsle/Core/VFX/BP_HallucFog.BP_HallucFog_C` | YES |
-| Halluc Char | `/Game/TheIsle/Core/Characters/BP_HallucinationChar.BP_HallucinationChar_C` | NO (server-side gate) |
-| Smite Effect | `/Game/TheIsle/Core/VFX/BP_SmiteEffect.BP_SmiteEffect_C` | NO (server-side gate) |
-| Various ambient FX | `/Game/TheIsle/Core/VFX/BP_*` | All NO |
+| HallucinationFog | `/Game/TheIsle/Core/Characters/Blueprints/BP_HallucinationFog.BP_HallucinationFog_C` | YES |
+| HallucinationChar | `/Game/TheIsle/Core/Characters/Blueprints/BP_HallucinationChar.BP_HallucinationChar_C` | NO (server-side gate) |
+| Smite Effect | `/Game/TheIsle/Core/Spawnables/BP_SmiteEffect.BP_SmiteEffect_C` | NO (server-side gate) |
+| BloodSplat, Footprint, Puke, Flies | `/Game/TheIsle/Core/Characters/Blueprints/BP_*_C` | All NO (server-side gate) |
+| Various other ambient FX | various paths | All NO |
 
 The halluc fog is the exception that renders because it uses a fog volume actor whose visual data IS in the replicated state. Other VFX use Niagara particle systems that require the rendering pipeline to be active, which the dedicated server doesn't have.
 

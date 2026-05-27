@@ -209,27 +209,15 @@ These hook successfully via `RegisterHook` and actually fire during normal play:
 - `/Script/TheIsle.TIPlayerController:PrepareSafeLogout()` fires when safe logout starts. Fires twice per initiation.
 - `/Script/TheIsle.TIPlayerController:GetChatMessage(...)` fires when chat is received. One fire per receiver in range, hence the dedup requirement on chat handlers.
 
-These hook successfully but never actually fire in normal play (they exist as declared UFunctions but no game code path triggers them):
+These hook successfully but never actually fire in normal play (they exist as declared UFunctions but no game code path triggers them). The set below is composite — primary backing is OnLoginProbe + DamageProbe + ParkRedeemProbe source code, plus some observational play. Probe-anchored items are confirmed; observational items are marked.
 
-- `OnPlayerLoginStatusChange`
-- `EndLoadingScreen`
-- `OpenSpawnZoneSelect`
-- `OpenFactionSelect`
-- `Logout`
-- `SafeLogout`
-- `CancelSafeLogout`
-- `ClientLogout`
-- `ClientKicked`
-- `RequestInitialSpawn`
-- `SpawnInRandomNest`
-- `RequestSpawnInNestAsSpecies`
-- `RequestSpawnInNestByKey`
-- `UpdatePlayerCredential`
-- `PrintLogout`
-- `OnPlayerRespawned`
-- `OnPawnKicked`
-- `RequestSpawnInNest`
-- `OnPawnDeath`
+Probe-anchored (verified by source code in `Mods/<Probe>/Scripts/main.lua`):
+- `EndLoadingScreen`, `OpenSpawnZoneSelect`, `OpenFactionSelect`, `Logout`, `SafeLogout`, `CancelSafeLogout`, `ClientLogout`, `ClientKicked`, `RequestInitialSpawn`, `SpawnInRandomNest`, `RequestSpawnInNestAsSpecies`, `RequestSpawnInNestByKey` — all in OnLoginProbe's candidate registration list.
+- `OnPawnDeath` — in DamageProbe's candidate registration list.
+- `OnPlayerRespawned`, `RequestRespawn`, `AddSpawnRequest`, `TryToRespawn`, `ClientRestart`, `Possess` — in ParkRedeemProbe's candidate registration list.
+
+Observational only (not in any probe source I located, but reported as non-firing during normal play):
+- `OnPlayerLoginStatusChange`, `UpdatePlayerCredential`, `PrintLogout`, `OnPawnKicked`, `RequestSpawnInNest`
 
 These did not register on the class paths I personally tried (this is "didn't work for me at the paths I tested", not "impossible" — if you have a working hook path for any of these, please open an issue or PR):
 
