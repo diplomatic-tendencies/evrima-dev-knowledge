@@ -202,7 +202,7 @@ Second crash: an AI probe spawned a Triceratops with a Diabloceratops AI control
 
 The mistake in both cases was assuming that a `pcall(function() addr = actor:GetAddress() end)` check would catch the freed-actor case. It does not. Freed-but-not-yet-reused memory still returns a non-zero address. The address check passes, the destroy on that freed slot is what AVs.
 
-The fix is conservative cleanup. Don't try to destroy actors from Lua-side cleanup at all. Clear your tracking table. Tell the user to restart the server if they want full reset of spawned actors. If you really need runtime destroy, you have two options:
+The fix is conservative cleanup. Don't try to destroy actors from Lua-side cleanup at all. Clear your tracking table. restart the server if you want full reset of spawned actors. If you really need runtime destroy, you have two options:
 
 Option one: subscribe to a gameplay event that signals "this actor is gone" (PlayerStats HP=0 transition for dinos, or hook the OnDestroyed event if available) and proactively remove from tracking before the gameplay destroy completes. This needs the event to fire reliably, which most don't on this build.
 
