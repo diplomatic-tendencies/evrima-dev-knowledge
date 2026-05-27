@@ -8,7 +8,8 @@ The architectural challenge is not the color writing itself (the customizer fiel
 
 Three commands cover the entire user-facing API:
 
-- `!skin <r> <g> <b>` sets every color slot to the same RGB color. Quick test command.
+- `!skin <r> <g> <b>` sets the **four most visible color slots** (BodyColor, MarkingsColor, FlankColor, UnderbellyColor) to the same RGB. Quick test command. Does NOT touch Detail1Color, EyesColor, or MaleDisplayColor — use the per-slot or `all` variants to change those.
+- `!skin all <r> <g> <b>` sets ALL seven color slots to the same RGB.
 - `!skin <slot> <r> <g> <b>` sets one slot. Slot aliases accepted by SkinMod's parser:
   - `body` → `BodyColor`
   - `markings` / `marks` → `MarkingsColor`
@@ -17,7 +18,7 @@ Three commands cover the entire user-facing API:
   - `detail` / `details` / `detail1` → `Detail1Color`
   - `eyes` / `eye` → `EyesColor`
   - `breed` / `display` / `male` → `MaleDisplayColor`
-- `!skinreset` reverts to the engine's stored skin (clears the mod's per-player override).
+- `!skin reset` reverts to the engine's stored skin (clears the mod's per-player override).
 
 Color values accept either `0.0` to `1.0` floats or `0` to `255` integers; the parser detects which based on the value range.
 
@@ -33,66 +34,62 @@ The workaround is auto-restore. After every engine-driven skin load (which the m
 
 ## The auto-restore loop
 
-The loop is triggered by the presence registry's heartbeat. Every time the heartbeat sees a player (every 15 seconds via the refresh tick), the mod checks if there's a saved color set for that player. If yes, it re-applies the colors.
+The loop runs from the mod's 3-second poll tick (NOT the presence registry's 15-second refresh — the registry is just what tells the mod who's online). Each tick iterates online players from the presence registry and checks whether each player's current pawn address has changed since the last apply. If yes, re-apply.
 
-The implementation needs to be carefully gated:
+The implementation pattern (live SkinMod):
 
 ```lua
-local lastAppliedAt = {}  -- steam -> os.time() when last applied
-local REAPPLY_COOLDOWN = 10  -- seconds; don't re-apply more than this often
+local lastPawnAddr = {}  -- steam -> last applied pawn address
 
-local function maybeReapplySkin(steam, controller)
-    local saved = loadSavedColors(steam)
-    if saved == nil then return end  -- no override for this player
-
-    local now = os.time()
-    if lastAppliedAt[steam] and (now - lastAppliedAt[steam]) < REAPPLY_COOLDOWN then
-        return  -- rate limit
-    end
-
-    local pawn = livePawnFromCtrl(controller)
-    if pawn == nil then return end  -- pawn not yet spawned
-
-    local ok = applyCustomizer(pawn, saved)
-    if ok then
-        lastAppliedAt[steam] = now
+local function autoRestore()
+    local players = enumerateOnlinePlayers()
+    for _, p in ipairs(players) do
+        local saved = loadSkin(p.steam)
+        if saved ~= nil and p.pawn ~= nil then
+            local addr
+            pcall(function() addr = p.pawn:GetAddress() end)
+            local addrKey = tostring(addr or 0)
+            if lastPawnAddr[p.steam] ~= addrKey then
+                applySkin(p.pawn, saved)
+                lastPawnAddr[p.steam] = addrKey
+            end
+        end
     end
 end
+
+LoopInGameThreadWithDelay(3000, function()
+    safeCall("autoRestore", autoRestore)
+end)
 ```
 
-The 10-second cooldown prevents the mod from re-applying on every 15-second heartbeat (which would technically work but produces unnecessary work).
+Gating on pawn-address-change (NOT a fixed time cooldown) is the trick: the apply fires once per fresh pawn instance and then sits idle until the pawn changes (death, transform, reconnect). This naturally rate-limits the apply without any cooldown timer.
 
-The first apply happens shortly after the engine's skin-load completes. The engine's skin-load on login takes a few seconds (varies by client connection speed); the mod's 15-second heartbeat plus apply usually catches up within 20 to 30 seconds of login. Some players notice the brief original-colors window before the override kicks in; this is intrinsic to the architecture and not something a Lua mod can avoid.
+The first apply happens shortly after the engine's skin-load completes. The engine's skin-load on login takes a few seconds; the 3-second poll picks up the new pawn address within one or two ticks and applies. Some players notice the brief original-colors window before the override kicks in; this is intrinsic to the architecture.
 
 ## Persistence layout
 
 ```
 Mods/SkinMod/Saved/
-├── skins/
-│   ├── <steam>.json
-│   └── <steam>.json
-└── readme.txt
+└── skins/
+    ├── <steam>.json
+    └── <steam>.json
 ```
 
-The per-player JSON file:
+The per-player JSON file is a **flat** object keyed by **engine field names** (BodyColor, MarkingsColor, FlankColor, UnderbellyColor, Detail1Color, EyesColor, MaleDisplayColor) with **lowercase** `r/g/b/a` color sub-keys. No `steam`/`updatedAt`/`colors` envelope:
 
 ```json
 {
-  "steam": "76561198XXXXXXX",
-  "updatedAt": 1716508800,
-  "colors": {
-    "body":       {"R": 0.5, "G": 0.8, "B": 0.2, "A": 1.0},
-    "markings":   {"R": 0.4, "G": 0.7, "B": 0.1, "A": 1.0},
-    "flank":      {"R": 0.9, "G": 0.9, "B": 0.9, "A": 1.0},
-    "underbelly": {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
-    "detail":     {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "eyes":       {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
-    "breed":      {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0}
-  }
+  "BodyColor":       {"r": 0.5, "g": 0.8, "b": 0.2, "a": 1.0},
+  "MarkingsColor":   {"r": 0.4, "g": 0.7, "b": 0.1, "a": 1.0},
+  "FlankColor":      {"r": 0.9, "g": 0.9, "b": 0.9, "a": 1.0},
+  "UnderbellyColor": {"r": 0.1, "g": 0.1, "b": 0.1, "a": 1.0},
+  "Detail1Color":    {"r": 0.5, "g": 0.5, "b": 0.5, "a": 1.0},
+  "EyesColor":       {"r": 0.4, "g": 0.4, "b": 0.4, "a": 1.0},
+  "MaleDisplayColor":{"r": 0.6, "g": 0.6, "b": 0.6, "a": 1.0}
 }
 ```
 
-The file is overwritten on every `!skin` command. The `!skinreset` command deletes the file rather than nulling the contents.
+Only fields the player has explicitly set are stored — the file may contain only a subset of the 7 fields. The file is overwritten on every `!skin` command. The `!skin reset` sub-command deletes the file rather than nulling its contents.
 
 ## The pure-black gotcha
 
@@ -124,13 +121,13 @@ The dirty architecture (don't do this): both mods race for the customizer write,
 
 ## Performance notes
 
-The customizer write is cheap (well under 1 millisecond per write). The disk write on `!skin` command is one synchronous JSON write per command. The auto-restore tick is a constant-time check per online player, executed every 15 seconds.
+The customizer write is cheap (well under 1 millisecond per write). The disk write on `!skin` command is one synchronous JSON write per command. The auto-restore tick is a constant-time check per online player, executed every 3 seconds.
 
-For a 400-slot server with say 100 players online and 50 of them using `!skin` overrides, the auto-restore work is:
+For a 400-slot server with say 100 players online and 50 of them using `!skin` overrides, per-tick (3-second) work is:
 
-- 100 heartbeat reads per tick (cheap controller lookups)
-- About 50 file reads per tick (the actual override checks)
-- About 5 customizer writes per tick (rate-limited by the 10-second cooldown)
+- 100 presence-registry reads (cheap controller lookups)
+- About 50 file reads (the actual override checks) — only on players whose pawn address changed since last tick
+- A handful of customizer writes (only on fresh-pawn detections — pawn-address-change gating means a settled player triggers zero writes)
 
 This is well under 1 percent of the server's tick budget. Not a perf concern.
 

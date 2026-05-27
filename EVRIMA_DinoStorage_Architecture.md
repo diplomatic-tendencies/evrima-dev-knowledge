@@ -19,15 +19,20 @@ The store side intentionally does not require any flags or arguments. The redeem
 
 ```
 Mods/DinoStorage/Saved/
-├── storage.json              # Index of all stored states (one line per entry)
-├── stored/
-│   ├── <steam>.json          # Per-player stored state
-│   └── <steam>.json
-└── archive/                  # Optional: old states moved here on overwrite
-    └── <steam>-<timestamp>.json
+├── storage.json              # Index of all stored states; "schema": 4
+├── slot_caps.json            # Per-player slot-cap CRUD state
+└── stored/
+    └── <steam>/              # Per-player subdirectory (v018+ layout)
+        ├── default.json      # Default slot
+        ├── <slotName>.json   # Optional named alternative slots
+        └── ...
 ```
 
-The per-player JSON file is the source of truth. The index file (`storage.json`) is a denormalized listing for fast enumeration. Write the per-player file first, then update the index. If a crash happens between those two writes, the index becomes inconsistent with the per-player files, but the per-player file is what `!redeem` actually reads. The index can be rebuilt at any time by scanning `stored/`.
+The per-slot JSON file is the source of truth. The index file (`storage.json`) is a denormalized listing for fast enumeration; its `"schema"` value (currently `4`) is the version of the INDEX format, separate from the per-slot file's `"version"` field.
+
+v017 used a flat `stored/<steam>.json` layout. v018+ migrated to `stored/<steam>/<slot>.json` to support multiple stored dinos per player. The mod auto-migrates flat files at boot if any are detected.
+
+Write the per-slot file first, then update the index. If a crash happens between those two writes, the index becomes inconsistent with the per-slot files, but the per-slot file is what `!redeem` actually reads. The index can be rebuilt at any time by scanning `stored/<steam>/*.json`.
 
 ## The transform-in-place architecture
 
@@ -91,66 +96,85 @@ Heavy actions are deferred to a poll tick using the rule-5 hook-to-deferred patt
 
 The presence registry pattern (`EVRIMA_Presence_Registry.md`) handles all online-player enumeration. DinoStorage itself does not iterate online players for the core store/redeem flow, but it does need it for admin diagnostic commands and for the per-mod heartbeat updates.
 
-## JSON schema
+## JSON schema (per-slot file)
 
-The per-player stored state file has this top-level structure:
+The per-slot stored state file has this top-level structure (matches the live `writeStateJson` output exactly):
 
 ```json
 {
-  "version": "v021",
-  "steam": "76561198XXXXXXX",
-  "storedAt": 1716508800,
-  "class": "/Game/.../BP_Tyrannosaurus_C",
-  "growth": 1.0,
-  "isFemale": false,
-  "vitals": {
-    "health": 9500, "stamina": 100, "hunger": 50, "thirst": 40,
-    "oxygen": 100, "blood": 100, "lockedDamage": 0,
-    "food": 600, "rottenValue": 0, "waterLevel": 100,
-    "maxHunger": 100, "maxFood": 600, "maxThirst": 100, "maxStamina": 100
-  },
-  "location": {"x": 12345.0, "y": 67890.0, "z": 100.0,
-               "pitch": 0, "yaw": 90, "roll": 0},
-  "prime": {
-    "eligible": true,
-    "cond1": true,  "cond2": true,  "cond3": true,  "cond4": true,  "cond5": true,
-    "cond6": true,  "cond7": true,  "cond8": true,  "cond9": true,  "cond10": true
-  },
+  "version": 1,
+  "slot": "default",
+  "capturedAt": 1716508800,
+  "classPath": "/Game/TheIsle/Core/Characters/Dinosaurs/Tyrannosaurus/BP_Tyrannosaurus.BP_Tyrannosaurus_C",
+  "growth": 0.7522,
+  "health": 9349.999,
+  "stamina": 778.4647,
+  "hunger": 2998.95,
+  "thirst": 971.717,
+  "oxygen": 776.9647,
+  "blood": 9349.999,
+  "lockedDamage": 0.0,
+  "food": 4674.9995,
+  "waterLevel": -1022646.94,
+  "rottenValue": 1800.0,
+  "maxHunger": 3085.5,
+  "maxFoodValue": 4674.9995,
+  "maxThirst": 1000.0,
+  "maxStamina": 778.4647,
+  "isFemale": true,
+  "isPrime": false,
+  "elderStacks": 0,
+  "unlockRequiredMutations": ["Traumatic Thrombosis"],
   "nutrients": {
-    "carb": 100, "protein": 80, "lipid": 60, "bones": 40,
-    "cannibal": 0, "magy": 0, "rottenFlesh": 0, "mushrooms": 0,
-    "malnutrition": false
+    "carbValue": 0.0, "proteinValue": 0.0, "lipidValue": 0.0,
+    "bonesValue": 0.0, "cannibalValue": 0.0, "magyValue": 0.0,
+    "rottenFleshValue": 0.0, "mushroomsValue": 0.0,
+    "bMalnutrition": true
+  },
+  "primeData": {
+    "cond1": false, "cond2": false, "cond3": false, "cond4": false, "cond5": false,
+    "cond6": false, "cond7": false, "cond8": true,  "cond9": false, "cond10": false,
+    "eligible": false
   },
   "mutations": {
     "Slot1": "Truculency", "Slot2": "Photosynthetic Tissue",
     "Slot3": "Reniculate Kidneys", "Slot4": "Traumatic Thrombosis",
-    "ParentSlot1": "Epidermal Fibrosis", "ParentSlot2": "...",
-    "ParentSlot3": "...", "ParentSlot4": "...",
-    "ElderSlot1A": "...", "ElderSlot1B": "...",
-    "ElderSlot2A": "...", "ElderSlot2B": "...",
-    "ElderSlot3A": "...", "ElderSlot3B": "...",
-    "ElderSlot4A": "...", "ElderSlot4B": "...",
-    "elderStacks": 2
+    "ParentSlot1": "Epidermal Fibrosis",
+    "ParentSlot2": "", "ParentSlot3": "", "ParentSlot4": "",
+    "ElderSlot1A": "", "ElderSlot1B": "",
+    "ElderSlot2A": "", "ElderSlot2B": "",
+    "ElderSlot3A": "", "ElderSlot3B": "",
+    "ElderSlot4A": "", "ElderSlot4B": ""
   },
-  "unlockRequiredMutations": [
-    "Reniculate Kidneys", "Reinforced Tendons",
-    "Traumatic Thrombosis", "Multichambered Lungs"
-  ],
   "skin": {
-    "body":       {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "markings":   {"R": 0.3, "G": 0.3, "B": 0.3, "A": 1.0},
-    "flank":      {"R": 0.8, "G": 0.8, "B": 0.8, "A": 1.0},
-    "underbelly": {"R": 0.1, "G": 0.1, "B": 0.1, "A": 1.0},
-    "detail":     {"R": 0.5, "G": 0.5, "B": 0.5, "A": 1.0},
-    "eyes":       {"R": 0.4, "G": 0.4, "B": 0.4, "A": 1.0},
-    "breed":      {"R": 0.6, "G": 0.6, "B": 0.6, "A": 1.0},
-    "skinVariation": 0.5,
-    "patternIndex": 2
-  }
+    "maleDisplay": {"r": 0.149, "g": 0.039, "b": 0.024, "a": 1.0},
+    "markings":    {"r": 0.01,  "g": 0.01,  "b": 0.01,  "a": 1.0},
+    "body":        {"r": 0.01,  "g": 0.01,  "b": 0.01,  "a": 1.0},
+    "flank":       {"r": 0.0,   "g": 1.0,   "b": 0.5,   "a": 1.0},
+    "underbelly":  {"r": 0.0,   "g": 1.0,   "b": 0.5,   "a": 1.0},
+    "detail1":     {"r": 0.0,   "g": 0.0,   "b": 0.0,   "a": 1.0},
+    "eyes":        {"r": 0.749, "g": 0.149, "b": 0.0,   "a": 0.996},
+    "skinVariation": 8.0,
+    "patternIndex": 0
+  },
+  "location": {"x": 197871.37, "y": -76803.84, "z": 22646.93},
+  "rotation": {"pitch": 0.0, "yaw": 37.96, "roll": 0.0}
 }
 ```
 
-The `version` field is critical. The schema changed twice between v016 (skin added), v019 (elder stacks added), and v021 (unlock list added). Code reads any version forward; missing fields take sensible defaults; the version field's main use is debugging "why did this old save break."
+Schema-shape notes (these matter for round-trip consumers):
+
+- `"version": 1` is an **integer** (the schema version of the per-slot file), not a string like `"v021"`. The mod's release version is separate.
+- `"capturedAt"` (NOT `storedAt`), `"classPath"` (NOT `class`).
+- **Vitals are FLAT at top level** (`health`, `stamina`, etc.), NOT nested under a `vitals` object.
+- `"primeData"` (NOT `prime`). Keys are `cond1`..`cond10` + `eligible`.
+- `"nutrients"` keys are the engine field names (`carbValue`, `proteinValue`, etc.) plus `bMalnutrition` — NOT friendly aliases.
+- `"elderStacks"` is **top-level**, NOT nested under `mutations`.
+- `"unlockRequiredMutations"` is top-level.
+- `"skin"` uses friendly aliases (`body`, `markings`, `flank`, `underbelly`, `detail1`, `eyes`, `maleDisplay`) with **lowercase** `r/g/b/a` color sub-keys.
+- `"location"` and `"rotation"` are **separate** top-level objects; rotation has `pitch/yaw/roll`.
+
+The schema changed across versions but currently sits at `"version": 1` integer. Code reads any version forward; missing fields take sensible defaults.
 
 ## Notable design choices
 
@@ -162,7 +186,7 @@ A few choices that look obvious in hindsight but were not at the time.
 
 **Synchronous capture, deferred restore.** Capture runs in one tick (all reads, immediately followed by SetHealth(0)). Restore runs in a deferred tick (3-second delay after the `!redeem` command, then a further 500ms internal defer for the field-write phase). This is the pattern that survives the engine's various settle-window requirements.
 
-**Same-species redemption only by default.** Cross-species redemption visually breaks HelloEvrima's nest tracking (the nest mesh disappears on species mismatch). The mod could allow it, but the user experience is bad. Same-species lock is the default.
+**Same-species redemption only by default.** Cross-species redemption can visually break coexisting nest-persistence mods (the nest mesh disappears on species mismatch) and produces a generally bad user experience. Same-species lock is the default.
 
 **No respawn API ever called.** The whole architecture is built on the assumption that `RequestRespawn` is unreachable from Lua. This turned out to be correct and saved a lot of failed approach paths.
 
