@@ -35,6 +35,7 @@ After those five, the rest is reference material. Read as needed.
 - [EVRIMA_Presence_Registry.md](EVRIMA_Presence_Registry.md): safe online-player enumeration (the obvious APIs are broken)
 - [EVRIMA_State_Restore_Cookbook.md](EVRIMA_State_Restore_Cookbook.md): full recipe for capturing and restoring dino state
 - [EVRIMA_Prime_Elder_Mechanism.md](EVRIMA_Prime_Elder_Mechanism.md): how prime status really works and how to force it from Lua
+- [EVRIMA_Species_Swap.md](EVRIMA_Species_Swap.md): live species swap of a player's dino — possession plus the three engine bindings (first working implementation)
 - [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md): the seven color fields, UI label mapping, write recipe
 - [EVRIMA_EntombBonus_Fix.md](EVRIMA_EntombBonus_Fix.md): elder-stacks counter fix for mutation tier persistence
 - [EVRIMA_QuestMutation_Fix.md](EVRIMA_QuestMutation_Fix.md): quest-mutation slot persistence fix
