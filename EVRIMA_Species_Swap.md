@@ -81,6 +81,25 @@ newPawn:SaveDataToFile(false)
 
 In production, wrap step 6 in a deferred re-verify one tick later (~2s) as a fallback, and treat the synchronous check as the fast path. Every call above is pcall-wrapped in the real implementation; shown bare for readability.
 
+## Where to run this (execution context)
+
+The recipe's "same tick" language assumes you are already in the right place. Two contexts are live-proven:
+
+- **A `LoopInGameThreadWithDelay` tick callback** — the recommended home for the whole sequence. It is the one context the safety rules bless for every heavy native call, and the deferred verify naturally lives on the same timer.
+- **Directly inside a `GetChatMessage` hook callback** — the production chat path runs spawn → bindings → `Possess` synchronously in the hook and has been stable across many live swaps. This inherits the rule-5 risk profile (`ClientShowNotification` verifiably DOES crash from hook bodies — notifications must still be queued and drained from a tick), so if you want maximum margin, queue the command in the hook and execute it from your tick.
+
+Unproven contexts — do not assume they work:
+
+- **The UE4SS GUI console / Lua REPL.** Never tested here. Reports of "the actor spawns, then the Lua worker hangs or the server dumps" are consistent with driving the recipe interactively. Put the code in a mod tick and trigger it via chat or a flag file instead.
+- Anything asynchronous (`ExecuteAsync`, coroutines, threads of your own).
+
+Two adjacent requirements that bite people who skip them:
+
+- **The world must come from the game mode**: `gm:GetWorld()` with `gm` freshly derived via the `FindFirstOf("BP_SurvivalGameMode_C")` candidate chain on *every* call — never cached, and never acquired by other routes (`FindFirstOf("World")` can hand you the wrong or stale `UWorld` and produces exactly the spawns-then-dumps signature).
+- **Location and rotation are plain Lua tables** (`{X=,Y=,Z=}` / `{Pitch=,Yaw=,Roll=}`), freshly built each call — never pass the `K2_GetActorLocation()` userdata through directly.
+
+And the standing reminder from the safety rules: **pcall is not the safety mechanism here.** These native AVs are not catchable from Lua; the real guards are the right execution context, fresh object derivation every call, and the `GetAddress() ~= 0` filter.
+
 ## Disposing of the old body
 
 Corpse-ifying the old pawn (the BodyDrop recipe) works but leaves an **eatable body** — store-swap-eat-your-own-corpse is a free-meat dupe, and the lingering corpse ruins the transformation illusion. The production answer is `K2_DestroyActor` — which safety rule 9b ordinarily bans.
