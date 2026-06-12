@@ -116,10 +116,6 @@ Real config knobs (defaults from `BodyDrop\Scripts\main.lua`; many production de
 | `excludeSameSpeciesAsAnchor` | false | When true, the spawned corpse won't be the same species as the anchor player |
 | `groupPolicy` | `"individual"` | One of `individual` / `per_group` / `solo_only` — see GroupId-aware spawning |
 
-Production servers typically tighten these — e.g. dev server config currently runs with `growthFilterEnabled=true`, `hungerFilterEnabled=true`, `excludeSameSpeciesAsAnchor=true`. Check your `Saved/config.json` to see runtime values.
-
-Skip-log signature (in UE4SS.log): `[BodyDrop] Spawn tick skipped: no eligible anchors (filtered: N well-fed)`
-
 The filters apply per-tick; each tick the spawn loop builds the eligible-anchor list, picks an anchor, picks a species (excluding the anchor's species if configured), and spawns one corpse at a scatter offset around that anchor.
 
 There is no per-caller rate limit on the inbox / chat command surface itself — the rate-limiting is the spawn loop's own tick interval.
