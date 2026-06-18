@@ -45,19 +45,19 @@ The rule of thumb that fell out of all of this: in any given tick, get the struc
 
 ---
 
-## Rule 3: There is no working bulk-enumeration of online players
+## Rule 3: Don't enumerate players with FindAllOf; the engine collections do work
 
-Both candidate paths to "give me every connected player" are broken in different ways on EVRIMA dedicated servers.
+This rule used to say there was no working bulk enumeration of online players at all. That was wrong, and the wrong part was mine. The crash danger below is real and stands; the "nothing works" conclusion does not.
 
-`FindAllOf("TIPlayerController")` returns stale post-disconnect controllers for a window of a few minutes after a player leaves. Calling `K2_GetPawn`, `GetSteamId`, or really any method on a stale controller crashes the server with a native access violation that pcall cannot catch. Verified the crash twice; the second time I had a pcall around literally every line and still got the AV.
+The genuine hazard: `FindAllOf("TIPlayerController")` returns stale post-disconnect controllers for a window of a few minutes after a player leaves. Calling `K2_GetPawn`, `GetSteamId`, or really any method on a stale controller crashes the server with a native access violation that pcall cannot catch. I verified the crash twice; the second time I had a pcall around literally every line and still got the AV. `FindAllOf("TIDinosaurBase")` and `gm.AllPlayerCharacters` are the same story — stale ghost pawns that crash on access. Do not enumerate players or player pawns through `FindAllOf` or `AllPlayerCharacters`.
 
-`gm.AllPlayerControllers` does not crash, but it always returns an empty array even when players are connected and actively chatting. I verified this side-by-side with a working chat hook plus `gm:GetControllerBySteamId(steam)` proving the players genuinely exist on the server. The engine just doesn't populate `AllPlayerControllers` on this build. Using this in production looks like "no crashes, no players" which is a particularly nasty silent-failure mode because your mod looks like it's working until you realize nothing fires.
+What I got wrong: I reported `gm.AllPlayerControllers` as "always empty," verified it side by side with a working chat hook, and concluded the engine didn't populate it on this build. It is populated. It is a `TSet`, not a TArray, and reading a set with `#` or `[i]` returns nothing no matter how many elements it holds — that was the whole bug. Iterate it with `:ForEach(function(elem) ... end)` (a TSet's ForEach hands you the element as the first argument, not the `(index, element)` pair a TArray gives) and the players are there. `GameState.PlayerArray` (a `TArray<APlayerState*>`, reached via `gm:GetWorld().GameState` or `FindFirstOf("TIGameStateBase")`) also works and is cleaner: `playerArray[i]:GetOwningController()` then `:GetSteamId():ToString()` gives controller and steam directly. Both verified populated and iterable, solo, on the 2026-06-06 build.
 
-`FindAllOf("TIDinosaurBase")` and `gm.AllPlayerCharacters` are similarly broken. They retain stale ghost pawns that crash on access.
+The honest caveat, and why the registry still exists: the engine collections are verified to enumerate online players, but not verified to behave on disconnect or at multiplayer scale. They are engine-maintained, so they should drop a leaving player cleanly where `FindAllOf` does not, but UE keeps a brief `InactivePlayerArray` window after a disconnect and I have not tested whether a just-departed player lingers there long enough to crash an access. Until that is checked at two-plus players with a real disconnect, treat the collections as a safe online snapshot and the self-maintained presence registry as the safe production enumerator, because its eviction is the proven part.
 
-The fix is a per-mod self-maintained presence registry, fed by hooks. The full pattern is documented in `EVRIMA_Presence_Registry.md`. The short version: hook `/Script/TheIsle.TIPlayerController:SetAdminCred` (which fires once per controller on connect and again as a periodic heartbeat), maintain `online[steam] = { firstSeen, lastSeen }` in module scope, and run an active refresh tick every 15 seconds that re-derives controllers via `gm:GetControllerBySteamId(steam)` and evicts entries whose controller goes nil.
+The registry pattern is documented in full in `EVRIMA_Presence_Registry.md`. The short version: hook `/Script/TheIsle.TIPlayerController:SetAdminCred` (which fires once per controller on connect and again as a periodic heartbeat), maintain `online[steam] = { firstSeen, lastSeen }` in module scope, and run an active refresh tick every 15 seconds that re-derives controllers via `gm:GetControllerBySteamId(steam)` and evicts entries whose controller goes nil.
 
-Never cache the controller wrapper from any hook parameter. Re-derive it on every iteration via `gm:GetControllerBySteamId(steam)`. This is cheap and always returns a valid pointer for online steams. if anyone knows a better way please add it here.
+Whichever enumerator you use, never cache the controller wrapper from a hook parameter. Re-derive it via `gm:GetControllerBySteamId(steam)`, which is cheap and always returns a valid pointer for an online steam.
 
 ---
 
@@ -232,7 +232,7 @@ When a player redeems or transforms via a state-restore mod, the old pawn linger
 
 Filtering by "controller is nil" does not help, because the call to determine nullness is what crashes.
 
-The safe enumeration path is the self-maintained presence registry (rule 3). Both `gm.AllPlayerCharacters` and `FindAllOf("TIPlayerController")` retain stale entries that crash on access; `gm.AllPlayerControllers` doesn't crash but is always empty. The registry pattern from rule 3 is the only viable path.
+The safe path is to enumerate by steam through the presence registry (rule 3) and resolve each to a live pawn with the rule-9a address check, rather than iterating pawns directly. `gm.AllPlayerCharacters` and `FindAllOf("TIPlayerController")` both retain stale entries that crash on access, so don't iterate pawns through them. The controller collections — `gm.AllPlayerControllers` (a TSet) and `GameState.PlayerArray` — do enumerate online players (rule 3), and they hand you controllers rather than the lingering ghost pawns, so they sidestep this particular crash; their disconnect behavior is still unverified, so the registry remains the production-safe choice.
 
 ---
 

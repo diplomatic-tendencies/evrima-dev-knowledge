@@ -1,20 +1,24 @@
 # EVRIMA presence registry pattern
 
-This is the fix for the broken bulk-enumeration of connected players on The Isle EVRIMA dedicated server. If you're writing any kind of UE4SS Lua mod that needs to iterate "everyone who is currently online," you need this pattern, because every obvious approach is broken in a different way.
+A self-maintained registry of connected players, fed by a heartbeat hook. It is the pattern I reach for whenever a mod needs to iterate "everyone online," and it stays the production-safe choice even though the engine's own player collections are not as broken as I first reported.
 
-## The problem
+That correction belongs up front, because an earlier version of this document (and `EVRIMA_Lua_Safety_Rules.md` rule 3) claimed there was no working bulk enumeration at all. That was wrong, and the mistake was mine: I read a TSet with array syntax, got nothing back, and concluded it was empty. The real picture is below. The registry still earns its place — its disconnect handling is the part that is actually proven, which is the hard part — but it is no longer the only option, and the docs should not have said it was.
 
-On EVRIMA, there is no working bulk-enumeration of online players via UE4SS Lua.
+## The enumeration paths
 
-`gm.AllPlayerControllers` returns an empty array even with players connected. Silent failure. Your iteration loop runs zero times, you get no error, and you spend half a day wondering why your mod looks like it's working but nothing fires.
+`gm.AllPlayerControllers` is populated, not empty. The catch is that it is a **TSet**, not a TArray. Reading it with `#` or `[i]` returns nothing from a set no matter how many elements it holds, which is exactly the "always empty" symptom I originally chased. Iterate it with `:ForEach(function(elem) ... end)`; a TSet's ForEach passes the element as the first argument, not the `(index, element)` pair a TArray gives you. Verified populated and iterable, solo, on the 2026-06-06 build.
 
-`gm.AllPlayerCharacters` returns stale ghost pawns. Touching any method on a ghost pawn (including `GetController()` itself) crashes the server with a native AV.
+`GameState.PlayerArray` is the cleaner path: a standard `TArray<APlayerState*>`, reached via `gm:GetWorld().GameState` or `FindFirstOf("TIGameStateBase")`. It is array-indexable, and `playerArray[i]:GetOwningController()` followed by `:GetSteamId():ToString()` hands you the controller and steam id directly. Prefer this for new code.
 
-`FindAllOf("TIPlayerController")` returns stale post-disconnect controllers for a window of a few minutes after a player leaves. Calling methods on them crashes too.
+What neither collection is verified to do — and the reason the registry still ships — is behave under disconnects and at multiplayer scale. The 2026-06-06 check was solo. These collections are engine-maintained, so they *should* drop a leaving player cleanly, unlike the `FindAllOf` paths below; but UE keeps a brief `InactivePlayerArray` window after a disconnect, and I have not verified that a recently-departed player doesn't linger in `PlayerArray` long enough to crash a `GetOwningController()` call on a freed object. Until that is tested at two-plus players with a real disconnect, treat the collections as a good online snapshot and the registry as the enumerator you trust in production.
 
-`FindAllOf("TIDinosaurBase")` and similar character-class enumerations are similarly broken.
+The paths that are genuinely broken, and stay broken:
 
-But `gm:GetControllerBySteamId(steam)` does work. For any steam ID known to be online, it returns a valid controller. The challenge is knowing which steams are online without enumerating.
+`gm.AllPlayerCharacters` returns stale ghost pawns. Touching any method on a ghost pawn, `GetController()` included, crashes the server with a native AV.
+
+`FindAllOf("TIPlayerController")` returns stale post-disconnect controllers for a window of a few minutes after a player leaves, and calling methods on them crashes. `FindAllOf("TIDinosaurBase")` and similar character-class enumerations have the same problem.
+
+`gm:GetControllerBySteamId(steam)` works for any online steam and returns a fresh valid controller. The registry's actual job is the narrow one of knowing which steams are online; resolving a known steam to a controller is already solved.
 
 ## The solution: heartbeat hook plus active refresh tick
 
@@ -34,10 +38,11 @@ Drop this into any mod's `main.lua`. About 50 lines including the helper:
 ```lua
 -- ============================================================================
 -- ONLINE PLAYER REGISTRY
--- gm.AllPlayerControllers is BROKEN on EVRIMA dedicated servers; it always
--- returns an empty array even with connected players. This module maintains
--- its own registry, fed by SetAdminCred heartbeat plus chat-hook as a
--- secondary heartbeat source. Entries expire after PRESENCE_EXPIRY_SEC of no
+-- The engine's player collections (gm.AllPlayerControllers, a TSet; and
+-- GameState.PlayerArray) do work for an online snapshot, but their disconnect
+-- behavior is unverified at multiplayer scale, so this module maintains its own
+-- registry whose eviction IS proven. Fed by SetAdminCred heartbeat plus chat-hook
+-- as a secondary source. Entries expire after PRESENCE_EXPIRY_SEC of no
 -- refresh OR when the steam's controller goes nil. Controllers are re-derived
 -- via gm:GetControllerBySteamId at iteration time; never cached from hook
 -- params.
@@ -228,6 +233,6 @@ The lesson: do not assume a UFunction by name. Build a spy mod that hooks every 
 
 ## Closing notes
 
-This is the single highest-leverage pattern in the EVRIMA Lua modding toolkit. Implement it once per mod, use it for every "what players are online" query, and never touch `gm.AllPlayerControllers` again.
+This is a high-leverage pattern in the EVRIMA Lua modding toolkit, and the one I trust for "what players are online" in production because its disconnect handling is proven. The engine collections (`gm.AllPlayerControllers` as a TSet via `ForEach`, `GameState.PlayerArray` as a TArray) also give you an online snapshot directly, and for a one-shot read they are less code; reach for the registry specifically when you need eviction you can rely on, until someone verifies the collections' disconnect behavior at scale.
 
 A common early mistake is implementing only the heartbeat hook without the 15-second refresh tick. The mod works for the first connection burst then goes dark for 4 minutes between heartbeat bursts. The refresh tick is what makes the pattern usable in production.

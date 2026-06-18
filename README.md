@@ -18,7 +18,7 @@ For a fresh start, read in this order:
 
 2. **[EVRIMA_Paths_Reference.md](EVRIMA_Paths_Reference.md)** is the layout reference. Where files live, what each one does, how to launch the server. Quick read.
 
-3. **[EVRIMA_Presence_Registry.md](EVRIMA_Presence_Registry.md)** is the most-reused pattern. Every mod that iterates online players uses this. It solves the problem that all the obvious enumeration APIs are broken in different ways.
+3. **[EVRIMA_Presence_Registry.md](EVRIMA_Presence_Registry.md)** is the most-reused pattern. Every mod that iterates online players uses this. The engine's own player collections also work for a one-shot read, but the registry's disconnect handling is the proven part, so it stays the production default.
 
 4. **[EVRIMA_State_Restore_Cookbook.md](EVRIMA_State_Restore_Cookbook.md)** is the deepest single document. If you're building anything involving player dino state (save, restore, transform, mutate), this is the recipe.
 
@@ -32,7 +32,7 @@ After those five, the rest is reference material. Read as needed.
 
 - [EVRIMA_Lua_Safety_Rules.md](EVRIMA_Lua_Safety_Rules.md): twelve hard rules for what NOT to do in UE4SS Lua on EVRIMA
 - [EVRIMA_Paths_Reference.md](EVRIMA_Paths_Reference.md): where everything lives on a server install
-- [EVRIMA_Presence_Registry.md](EVRIMA_Presence_Registry.md): safe online-player enumeration (the obvious APIs are broken)
+- [EVRIMA_Presence_Registry.md](EVRIMA_Presence_Registry.md): production-safe online-player enumeration, plus the engine collections that also work once you read them right
 - [EVRIMA_State_Restore_Cookbook.md](EVRIMA_State_Restore_Cookbook.md): full recipe for capturing and restoring dino state
 - [EVRIMA_Prime_Elder_Mechanism.md](EVRIMA_Prime_Elder_Mechanism.md): how prime status really works and how to force it from Lua
 - [EVRIMA_Species_Swap.md](EVRIMA_Species_Swap.md): live species swap of a player's dino — possession plus the three engine bindings (first working implementation)
