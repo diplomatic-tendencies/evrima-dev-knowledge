@@ -1,5 +1,7 @@
 # SkinMod architecture
 
+> **0.21.720 note:** the color-write recipe this mod was built on (mutate + `SetCustomizerData`) broke in the skin-overhaul patch — it silently no-ops now. The architecture below (persistence, auto-restore-on-login, the chat command layer) is all still correct; swap the apply function for the direct-write recipe in [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md), sanitize `PatternIndex` per the same doc, and retire the pure-black bump (the gotcha it guarded against was re-attributed — see the retraction section there).
+
 SkinMod lets players set arbitrary RGB colors on their dino via chat commands. Colors persist across reconnect, relog, and server restart via per-player JSON files plus an auto-restore-on-login mechanism.
 
 The architectural challenge is not the color writing itself (the customizer field map doc covers that). The challenge is making the colors stick despite the engine's own skin system trying to restore the original skin on every login.
@@ -91,23 +93,9 @@ The per-player JSON file is a **flat** object keyed by **engine field names** (B
 
 Only fields the player has explicitly set are stored — the file may contain only a subset of the 7 fields. The file is overwritten on every `!skin` command. The `!skin reset` sub-command deletes the file rather than nulling its contents.
 
-## The pure-black gotcha
+## The pure-black gotcha: retracted
 
-The engine treats `FLinearColor(0, 0, 0)` as "unset" in some replication paths. A player who set every color to pure black would see partial-default colors on relog. The fix is a `bumpPureBlack` helper that nudges any pure-zero channel to 0.01 (imperceptible but defeats the sentinel check).
-
-```lua
-local function bumpPureBlack(c)
-    if c == nil then return nil end
-    return {
-        R = (c.R == 0.0) and 0.01 or c.R,
-        G = (c.G == 0.0) and 0.01 or c.G,
-        B = (c.B == 0.0) and 0.01 or c.B,
-        A = c.A or 1.0,
-    }
-end
-```
-
-Apply this to every color before writing. The visual difference between 0.0 and 0.01 is unnoticeable; the practical difference is the colors persisting across login.
+Earlier revisions of this document taught a "pure black renders wrong" gotcha as engine fact — `FLinearColor(0, 0, 0)` supposedly read as "unset" in some replication paths — and prescribed a `bumpPureBlack` helper that nudged every zero channel to 0.01 before writing. **That diagnosis is retracted.** The failure it was invented to explain fits a different, since-documented signature (a whole apply silently dropped with the last-good render kept — see the retraction section in [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md) for the re-attribution and its remaining open test). The bump is also actively harmful: it makes true black unreachable for players. It is being removed from the production mod. If you built on an older copy of this doc, delete the bump and add `PatternIndex` sanitization (per the field-map doc) instead.
 
 ## Coordination with other state-restore mods
 
@@ -133,6 +121,6 @@ This is well under 1 percent of the server's tick budget. Not a perf concern.
 
 ## Closing notes
 
-The mod is short (about 400 lines of Lua including the persistence and command parser) but it took several iterations to nail. The pure-black gotcha was the first surprise; the auto-restore-on-login race was the second. The third surprise was that the engine's skin-load path is not hookable from Lua at all, which forced the auto-restore architecture rather than a clean "intercept and replace" approach.
+The mod is short (about 400 lines of Lua including the persistence and command parser) but it took several iterations to nail. The pure-black gotcha (since retracted — the surprise was real, the diagnosis was not) was the first surprise; the auto-restore-on-login race was the second. The third surprise was that the engine's skin-load path is not hookable from Lua at all, which forced the auto-restore architecture rather than a clean "intercept and replace" approach.
 
 Once the architecture clicked, the mod has been zero-maintenance in production. The presence-registry-driven heartbeat is a clean event source; the customizer field-write is a safe operation; the per-player JSON is trivial to back up and restore.

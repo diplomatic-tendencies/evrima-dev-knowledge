@@ -18,11 +18,17 @@ local function spawnCorpse(speciesClassPath, location, growthFraction, ragdollSe
     local world = gm:GetWorld()
     if world == nil then return nil, "no-world" end
 
-    -- Step 3: spawn the pawn ~15m above the requested location.
-    -- The terrain heightmap is uneven; spawning at ground Z often clips
-    -- the actor inside a hill. +1500 UU + ragdoll physics drops it to
-    -- actual ground in under 2 seconds.
-    local loc = { X = location.X, Y = location.Y, Z = location.Z + 1500 }
+    -- Step 3: find REAL ground under the requested XY and spawn just above it.
+    -- Do NOT spawn at a blind vertical offset like +1500: SpawnActor SUCCEEDS
+    -- in the empty void below the landscape, which is exactly how corpses end
+    -- up under the map. Trace straight down from high above the point to the
+    -- true surface, then reject water separately (a corpse must not float or
+    -- sink), spawn a little above the hit, and let the ragdoll (Step 10,
+    -- ToggleServerRagdoll) settle it.
+    local groundZ = traceGround(world, location.X, location.Y)  -- SphereTrace/LineTrace from a ceiling Z; nil if no solid ground
+    if groundZ == nil then return nil, "no-ground" end
+    if isPointWater(location.X, location.Y, groundZ) then return nil, "water" end
+    local loc = { X = location.X, Y = location.Y, Z = groundZ + 300 }
     local rot = { Pitch = 0, Yaw = 0, Roll = 0 }
     local pawn
     local ok = pcall(function() pawn = world:SpawnActor(pawnCls, loc, rot) end)
@@ -30,15 +36,22 @@ local function spawnCorpse(speciesClassPath, location, growthFraction, ragdollSe
 
     -- Step 4: validate the nullptr wrapper (terrain collision returns a
     -- non-nil Lua wrapper around a null UObject; calling methods on it
-    -- crashes the server). Retry with offset XY+Z if nullptr; BodyDrop
-    -- uses 8 scatter positions before giving up.
+    -- crashes the server). On failure, RESAMPLE a fresh XY around the anchor
+    -- and re-trace ground — never retry with an untraced vertical/lateral
+    -- offset (that is what put corpses under the map). Production BodyDrop
+    -- resamples a handful of annulus positions before giving up.
     local addr
     pcall(function() addr = pawn:GetAddress() end)
     if addr == nil or addr == 0 then return nil, "nullptr-wrapper" end
 
-    -- Step 5: network flags — mandatory for client visibility
+    -- Step 5: replication. SetReplicates + the ForceNetUpdate at the end are all a
+    -- corpse needs — it uses native distance relevancy exactly like a real
+    -- death body. Do NOT set bAlwaysRelevant: an always-relevant corpse enters
+    -- EVERY joining client's initial replication burst, and at scale that burst
+    -- is a client load-in crash (this flag was removed from BodyDrop in v004
+    -- for exactly that reason). bIsDead is a RepNotify, so clients entering
+    -- cull range pose the corpse via OnRep_IsNowDead on their own.
     pcall(function() pawn:SetReplicates(true) end)
-    pcall(function() pawn.bAlwaysRelevant = true end)
 
     -- Step 6: set growth BEFORE transitioning to corpse. Growth drives
     -- both the corpse mesh size (juvenile vs adult) and the food value.
@@ -61,6 +74,11 @@ end
 ```
 
 The engine does NOT correctly produce a ragdolled corpse from just `SetHealth(0)`. Without `bIsDead`, `OnRep_IsNowDead`, `ToggleServerRagdoll`, and `ActivateDeadbody`, the pawn either stays in idle animation or T-poses. `ActivateDeadbody` is post-death cleanup; it expects the death state flags to be set already.
+
+Two placement/replication rules the current mod (v004) settled the hard way, both encoded above and worth calling out because early BodyDrop got them wrong:
+
+- **Ground-trace, never a blind vertical offset.** An early version spawned at `location.Z + 1500` and trusted ragdoll physics to drop the body to the surface. `SpawnActor` succeeds in the empty space *below* the landscape too, so an anchor point that was itself under-map (or a trace-free offset over a steep slope) produced corpses buried under the world. The fix is to trace down to real ground at the candidate XY, reject water, and spawn just above the hit.
+- **No `bAlwaysRelevant`.** It looks like the flag that "makes clients see the corpse," but a corpse replicates fine on native distance relevancy (it is a dead pawn like any other, and `bIsDead` is a RepNotify). Marking corpses always-relevant instead forces every one of them into each joining client's initial replication burst; at a realistic corpse count that burst is a client load-in crash. v004 removed it.
 
 The growth value drives both the corpse mesh size (juvenile vs adult) and the food value of the corpse. Setting growth to 1.0 produces an adult-sized corpse with full food value. Setting growth to 0.5 produces a juvenile-sized corpse with proportionally less food.
 

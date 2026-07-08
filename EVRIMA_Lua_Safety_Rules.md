@@ -27,9 +27,9 @@ All of them produced 30-second-delayed access violations reading offset 0x70 ins
 
 This is the rule that took the longest to nail down. The naive version of the rule is "USTRUCT field access from Lua crashes." That's wrong. The refined version, after about a dozen experiments:
 
-**Unsafe**: touching FString, pointer, or UObject* fields on a USTRUCT by name. Example offenders: `FCustomizerDataBase.SkinCode` (FString at offset 0x88), every FString field on `FTIPlayerData`, every FString field on `FTIEgg`. Reading or writing these specific fields crashes UE4SS marshaling. Naming the field is what trips the marshal, not just having the struct in scope.
+**Unsafe**: touching FString, pointer, or UObject* fields on a USTRUCT by name. Example offenders: `FCustomizerDataBase.SkinCode` (FString — at 0xB8 as of the 0.21.720 struct growth, 0x88 before it), every FString field on `FTIPlayerData`, every FString field on `FTIEgg`. Reading or writing these specific fields crashes UE4SS marshaling. Naming the field is what trips the marshal, not just having the struct in scope.
 
-**Safe**: touching POD fields (FLinearColor, float, int, bool) on a struct that also contains an FString. For example, `cdata.BodyColor.R = 0.5` on `FCustomizerDataBase` works cleanly. You can read and write all seven FLinearColors on `FCustomizerDataBase` (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`) plus the `SkinVariation` float and the `PatternIndex` int and the `bIsFemale` bool, as long as you never name `SkinCode` itself. Verified live by writing all seven color fields to fresh values over multiple iterations on the same pawn, with the server staying alive for hours afterward.
+**Safe**: touching POD fields (FLinearColor, float, int, bool) on a struct that also contains an FString. For example, `cdata.BodyColor.R = 0.5` on `FCustomizerDataBase` works cleanly. You can read and write the FLinearColor fields on `FCustomizerDataBase` — the original seven (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`) plus the three added in 0.21.720 (`TeethColor`, `MouthColor`, `ClawsColor`; see the customizer field map for the current layout) — plus the `SkinVariation` float, the `PatternIndex` int, and the `bIsFemale` bool, as long as you never name `SkinCode` itself. Verified live by writing all seven original color fields to fresh values over multiple iterations on the same pawn, with the server staying alive for hours afterward; the three new fields are the same POD shape on the same struct.
 
 **Unsafe**: writing Lua strings into FName fields. `liveStruct.MutationSlot1 = "Truculency"` crashes UE4SS marshaling at 0x70. Same crash for passing Lua strings to UFunctions that expect FName parameters.
 
@@ -214,13 +214,16 @@ The high-confidence pattern for any mod that spawns actors: track for the read p
 
 ## Rule 10: Server-spawned actors don't replicate by default
 
-Even after `SpawnActor`, the client never gets the actor unless the network flags are flipped. The proven recipe, server-side, on the freshly-spawned actor:
+Even after `SpawnActor`, the client never gets the actor unless replication is enabled. The proven recipe, server-side, on the freshly-spawned actor:
 
 ```lua
 pcall(function() actor:SetReplicates(true) end)
-pcall(function() actor.bAlwaysRelevant = true end)  -- clients receive it regardless of distance
 pcall(function() actor:ForceNetUpdate() end)         -- push immediately
 ```
+
+These two are what an actor needs; it then replicates on **native distance relevancy** like anything else in the world (clients receive it when they're near it, exactly as they receive other players and corpses).
+
+**Do not reflexively add `actor.bAlwaysRelevant = true`.** It looks like the "make clients see it" flag, but all it does is force the actor into *every* joining client's initial replication burst. At any real count — a corpse spawner, an AI herd, a decor field — that inflated burst is a client load-in crash (the production corpse spawner had this exact flag removed for that reason, and always-relevant AI at scale is the same remote-client crash class). Reach for `bAlwaysRelevant` only for a single, deliberately must-always-see actor, never as a blanket visibility flag on a multi-spawn path.
 
 This is necessary but not sufficient for visible meshes; see rule 9.
 
@@ -245,6 +248,30 @@ If you replace a function body via an editor's find-and-replace, and leave orpha
 The bad behavior is UE4SS-specific: when the script fails to load, the mod silently fails. The mod's hooks never register. Its poll loops never start. Reload signals like `Saved/reload.flag` are never consumed because nothing's running to read it. Only a server restart will pick up the fix once you've corrected the syntax error.
 
 Always check `UE4SS.log` for `Error loading script` or `Failed to execute main script` lines after editing mod files. If your mod went dark and nothing fired, that's the first thing to look for.
+
+---
+
+## Rule 13: UpdateChat crashes from Lua
+
+`/Script/TheIsle.TIPlayerController:UpdateChat` is the function that puts a line into a player's chat box. It is the deliver side of chat, the counterpart to the `GetChatMessage` send side you hook for command parsing. Calling it from Lua takes the server down with an access violation inside the RPC's FText serialization. pcall does not catch it; the process is gone.
+
+The cause is the same marshaling class as rule 4's `RequestRespawn` and rule 2's FString fields. UpdateChat takes six parameters — two FText (the display name and the line), an FString steam id, the EChatMode, and two bools (bIsDev, bIsAdmin) — and the FText that UE4SS Lua hands the native RPC is not what the serializer expects during replication. It dereferences it and faults. Unlike rule 5's `ClientShowNotification`, deferring to a tick does not help here. The function itself is unreachable from Lua, not just unreachable from inside a hook.
+
+This bites because command parsing (hooking `GetChatMessage`, reading `!commands`) is pure Lua and always has been, which makes it natural to assume the whole chat system is Lua-reachable. The read half is. The deliver half is not. If a feature needs to put a line into someone's chat box (re-delivering a line cross-species, an in-chat reply from a bot, an admin line with a custom sender name) that half has to be a C++ side mod. The working C++ recipe, with FText copied into the parameter buffer and the FString constructed in place, is in `EVRIMA_Chat_System.md`.
+
+`ClientShowNotification` (the HUD/notification popup from rule 5 and the safe-notify pattern) is still the Lua-reachable way to message a single player, and it is a different function on a different surface. Use it from a tick and you are fine. UpdateChat specifically, the chat-box delivery, is the one that has to be C++.
+
+---
+
+## Rule 14: RegisterHook silently does not fire on some native functions
+
+`RegisterHook` on a UFunction normally just works; it is on the safe list at the bottom of this doc. But some functions accept a hook that then never fires, with no error and no crash. The one that cost me an afternoon is `/Script/TheIsle.TICharacterBase:ExecuteLongRoarEffect`, the call/vocalization effect. The hook registers cleanly, logs its ids on install, and then stays silent through dozens of real calls. It is a native call path that the string-based `RegisterHook` does not intercept on this build.
+
+This is a silent failure, the same family as rule 3's empty `AllPlayerControllers` and rule 12's dark mod. No crash, no error, just a hook doing nothing while you assume it is watching, and you end up debugging your filter logic when the problem is upstream of it. If a hook you are certain should be firing isn't, before you suspect anything else, suspect that `RegisterHook` never caught the function. The cheap check is a log line as the very first statement in the callback; if it never appears, the hook is not being invoked at all.
+
+The function still goes through `ProcessEvent` even when the per-function hook misses it. What caught `ExecuteLongRoarEffect` was the global process-event pre-callback, which sees every `ProcessEvent` call regardless of whether a named-function hook took. That callback is a C++ facility (`Hook::RegisterProcessEventPreCallback`); if your work is pure Lua and a function you need refuses to hook, this is one of the cases where a small C++ side mod earns its keep. The concrete use, catching the friendly call to drive cross-species grouping, is in `EVRIMA_Grouping_Mechanism.md`.
+
+I have not mapped which native functions `RegisterHook` misses and which it catches, and it is clearly not all of them, since most hooks in these docs fire fine. Treat this as "if one specific hook silently won't fire, that is a known failure mode, fall back to the process-event callback," not as a blanket claim about native functions.
 
 ---
 

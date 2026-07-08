@@ -1,0 +1,4 @@
+# Local working material - never publish.
+# third_party/TIE_Natives is a clone of someone else's repo (no license,
+# nested .git) kept locally as a cross-reference input for probes.
+third_party/

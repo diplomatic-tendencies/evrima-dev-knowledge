@@ -4,6 +4,10 @@ This is the working recipe for swapping a player's dino to a different species *
 
 The naive version of this feature is one call: `controller:Possess(newPawn)`. That call alone *appears* to work and silently breaks three engine systems. Most of this document is about the three bindings you must also write, how each was discovered, and the one function that shuts down your server.
 
+> **⚠ Two things in the recipe crash the *owning player's* client if you get them wrong — server-side everything looks fine, so you won't see it in your own testing until a player hits it:**
+> 1. **The swap target must be a PLAYABLE class** (one of the ~20 in `Game.ini AllowedClasses`). Non-playable AI/fauna classes — Psittacosaurus, Pterodactylus, Compsognathus and friends — possess perfectly fine server-side but **instantly crash the client of the player you swap onto them**. Whitelist the swap to the playable set; do not pass an arbitrary class from a config or a command argument unchecked.
+> 2. **Clamp `targetGrowth` to `[0.01, 1.0]` before `SetGrowth`.** A stored growth of `0`, a negative, or `>1` (easy to get from a restore slot) drives a degenerate client-side growth recompute that crashes the owning client. Note Lua's `growth or fallback` does **not** catch a stored `0` — `0` is truthy in Lua — so guard the value explicitly, not with `or`.
+
 ## Why the obvious paths fail
 
 | Path | Result |
@@ -46,10 +50,16 @@ local newPawn = world:SpawnActor(speciesCls,
     { X = loc.X, Y = loc.Y, Z = loc.Z + 300 }, { Pitch = 0, Yaw = yaw, Roll = 0 })
 -- check newPawn:GetAddress() ~= 0; retry with bigger offsets if not
 
--- 2. Network flags + state before anyone sees it
+-- 2. Network flags + state before anyone sees it.
+-- Clamp growth first: 0/negative/>1 fed to SetGrowth crashes the owning
+-- client (and `targetGrowth or 1.0` won't catch a stored 0 — 0 is truthy).
+local g = tonumber(targetGrowth) or 1.0
+if g < 0.01 then g = 0.01 elseif g > 1.0 then g = 1.0 end
 newPawn:SetReplicates(true)
-newPawn.bAlwaysRelevant = true
-newPawn:SetGrowth(targetGrowth)
+newPawn.bAlwaysRelevant = true   -- fine here: ONE owned player pawn per swap. Do
+                                 -- NOT copy this to a high-count spawner (corpses,
+                                 -- decor) — there it's a join-burst load-in crash.
+newPawn:SetGrowth(g)
 newPawn:SetHealth(newPawn:GetMaxHealth())
 
 -- 3. Ownership binding (the reconnect/save identity)
@@ -75,7 +85,10 @@ ctrl:RequestOnRespawnHudUpdate()
 newPawn:VerifyAndRemoveBlockAbilitiesTag()
 
 -- 9. Apply whatever state you're restoring (growth, vitals, mutations,
---    skin — the standard state-restore cookbook applies unchanged), then:
+--    skin — the standard state-restore cookbook applies unchanged). NOTE: if
+--    the restore re-applies a stored growth here, clamp it to [0.01,1.0] too —
+--    this is the second SetGrowth and the realistic spot a bad stored 0/>1
+--    sneaks back in. Then:
 newPawn:SaveDataToFile(false)
 ```
 
@@ -134,7 +147,7 @@ Destroy the *new* pawn by the same logic on every failure path (possession faile
 
 The immediate feature is obvious: stored-dino redemption without the kill→respawn-as-the-same-species→redeem dance. Our implementation routes the classic `!redeem` through the swap engine behind a config toggle — same species takes the legacy transform-in-place, different species swaps — so players redeem from *any* current dino, including a fresh hatchling of the wrong species.
 
-Less obviously, the bindings are the general-purpose answer to "how do I make the engine accept a Lua-spawned pawn as a real player character," which is the foundation for any feature in that space: species trials, shapeshifter events, admin-driven transformations, class-change shops. The possession mechanics were already proven for AI (see the AI spawn pair catalog); this document is the missing player-controller half.
+Less obviously, the bindings are the general-purpose answer to "how do I make the engine accept a Lua-spawned pawn as a real player character," which is the foundation for any feature in that space: species trials, shapeshifter events, admin-driven transformations, class-change shops. The possession mechanics were already proven for AI (see the AI spawn pair catalog); this document is the missing player-controller half. Whatever you build on top, keep the two client-crash guards from the warning above — the playable-only whitelist and the growth clamp — between any user/config input and the swap, because those features are exactly the ones that hand arbitrary classes and stored growth values to the recipe.
 
 ## Verification summary
 

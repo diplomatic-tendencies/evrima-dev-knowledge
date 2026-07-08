@@ -14,7 +14,11 @@ local pawnCls = StaticFindObject("/Game/.../BP_Tyrannosaurus.BP_Tyrannosaurus_C"
 local ctrlCls = StaticFindObject("/Script/TheIsle.TIAIRexController")
 local world = gameMode:GetWorld()
 
--- Try a few offsets if first attempt hits terrain
+-- Z here is illustrative. For a real spawn location, trace down to true ground
+-- at the XY first (line/sphere trace from a ceiling Z) rather than trusting a
+-- blind offset like +500 — SpawnActor succeeds in the void BELOW the landscape
+-- too, so an untraced offset over the wrong spot spawns the AI under the map.
+-- See the ground-trace gotcha in EVRIMA_StaticMesh_Spawning.md.
 local pawn = world:SpawnActor(pawnCls, {X=loc.X, Y=loc.Y, Z=loc.Z+500}, {Pitch=0, Yaw=0, Roll=0})
 -- IMPORTANT: validate pawn:GetAddress() ~= 0 (terrain collision returns nullptr wrapper)
 
@@ -129,8 +133,8 @@ Some playable / cut-content species don't have their own dedicated AI controller
 | Elite Catfish (`BP_Elite_Fish_CatFish_C`) | Possessed but didn't move. Fish AI needs the pawn to be in water at spawn. |
 | Elite Coelacanth (`BP_Elite_Fish_Coelacanth_C`) | Same as above. |
 | School fish (5 variants: Catfish, Hoplosternum, Longear, MuskelLunge, RainbowFish) | same water-context requirement. |
-| Kentrosaurus | Class loads but `SpawnActor` returns nullptr - confirmed stub class, no functional default subobjects. |
-| Parasaurolophus | Same as Kentrosaurus - stub class. |
+| Kentrosaurus | Pre-0.21.720 finding: class loaded but `SpawnActor` returned nullptr (stub class, no functional default subobjects at the time). **Kentrosaurus is a full playable species as of 0.21.720** — re-probe before relying on this row. |
+| Parasaurolophus | Same pre-0.21.720 finding as Kentrosaurus (stub). Post-patch status not re-probed. |
 
 ---
 
@@ -159,11 +163,11 @@ These are probably either cut content with unfinished pawn assets, or the pawns 
 
 4. **Default spawn growth is hatchling**. Call `SetGrowth(1.0)` AFTER `Possess()` for adult AI. Then re-apply vitals (`SetHealth/SetFood/SetThirst/SetStamina`) because `SetGrowth` resets them to max-of-the-new-size.
 
-5. **Server-spawned actors need network flags** for clients to see them:
+5. **Server-spawned actors need replication enabled** for clients to see them:
    ```lua
    pawn:SetReplicates(true)
-   pawn.bAlwaysRelevant = true
    pawn:ForceNetUpdate()
    ```
+   These two suffice; the pawn then replicates on native distance relevancy. **Do NOT set `pawn.bAlwaysRelevant = true` on spawned AI** — it forces every AI into each joining client's initial replication burst, and for a herd/pack that burst is a client load-in crash (the same remote-client crash class AI spawning already risks at scale; see safety rule 10 and the AI client-replication notes). Distance relevancy is what you want for AI anyway.
 
 6. **DON'T try to clean up AI from Lua** via `K2_DestroyActor`. If gameplay already destroyed the pawn, your destroy call crashes the server. For cleanup, restart the server. Track spawned actors for read-only purposes only; never for destroy paths.

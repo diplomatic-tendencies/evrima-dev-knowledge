@@ -148,6 +148,8 @@ local function readColor(cdata, fieldName)
 end
 ```
 
+**0.21.720 note on the skin block:** `GetCustomizerData()` is suspect since the skin overhaul (the write-side wrapper on the same surface silently broke, and the read wrapper is no longer trusted — see [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md)). New captures should read the live `pawn.CustomizerData` property instead, which also carries the three new color regions (teeth, mouth, claws) the patch added. The wrapper shape above is kept as the verified pre-patch form.
+
 ## File append + rotation
 
 Lines are appended one-at-a-time via `appendLine`. Rotation is built in via `rotateIfNeeded`:

@@ -1,6 +1,6 @@
 # DinoStorage architecture
 
-DinoStorage is a state-restore mod for The Isle EVRIMA. It lets players store a snapshot of their current dino and later redeem the same dino back, preserving every restorable stat. The current production version (v021) handles vitals, growth, max-vitals, all 16 mutation slots, prime status, elder-replication-stacks (Life-tier counter), quest-mutation unlocks, all nutrients, and skin colors.
+DinoStorage is a state-restore mod for The Isle EVRIMA. It lets players store a snapshot of their current dino and later redeem the same dino back, preserving every restorable stat. The current lineage (v028) handles vitals, growth, max-vitals, all 16 mutation slots, prime status, elder-replication-stacks (Life-tier counter), quest-mutation unlocks, all nutrients, and skin colors — with the caveat that the skin-restore path predates the 0.21.720 customizer overhaul and its redeem is pending re-verification on the new customizer (see the skin section and the customizer field-map doc).
 
 This document describes the architecture and the design decisions that produced the current version. The technical implementation of the underlying patterns (mutation persistence, elder stacks, customizer fields) lives in separate cookbook documents.
 
@@ -86,7 +86,7 @@ After both fixes, every mutation case round-trips cleanly: regular slots, quest 
 
 ## Skin handling
 
-Skin colors are restored via the 7 FLinearColor fields on `pawn.CustomizerData` (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`). The full pattern is in `EVRIMA_Customizer_Field_Map.md`. DinoStorage uses the per-field write path plus a `bumpPureBlack` helper to defeat the engine's pure-zero sentinel that would otherwise restore default colors after a relog.
+Skin colors are restored via per-field writes on `pawn.CustomizerData` — seven FLinearColor fields pre-0.21.720 (`BodyColor`, `MarkingsColor`, `FlankColor`, `UnderbellyColor`, `Detail1Color`, `EyesColor`, `MaleDisplayColor`); the 0.21.720 skin overhaul grew the struct to ten colors and broke the old push path, so the apply must follow the current recipe in `EVRIMA_Customizer_Field_Map.md`, and the mod's stored-skin redeem is pending re-verification on the new customizer. The `bumpPureBlack` helper that used to run before each write is retracted — the pure-zero "sentinel" it defended against was a misdiagnosis (see the retraction section in the field-map doc) and the bump is being removed; do not carry it into new code.
 
 ## Lifecycle and chat hook integration
 
@@ -194,6 +194,6 @@ A few choices that look obvious in hindsight but were not at the time.
 
 ## Closing notes
 
-The mod has been in production across multiple servers for months. The complete bug count post-v021 is zero known issues. Pre-v021 (the entomb-bonus and quest-mutation bugs) the issue rate was about one bug per major lineage feature.
+The mod has been in production across multiple servers for months and is stable, but "stable" is not "finished" — it has kept moving. The big correctness bugs were the pre-v021 ones (the entomb-bonus and quest-mutation bugs, about one per major lineage feature); post-v021 the work has been narrower — store-rule tuning and a redeem/controller-resolution fix among them — with the current lineage in the v028 range. Treat any absolute "zero known issues" framing with suspicion; the honest version is that the known-hard bugs are fixed and the remaining changes have been refinements.
 
 The hardest part of building it was not the obvious capture-and-restore loop. It was figuring out the engine's hidden state (elder stacks counter, quest-unlock validation gate, settle windows after bulk writes) that no public documentation describes. The patterns in `EVRIMA_State_Restore_Cookbook.md`, `EVRIMA_EntombBonus_Fix.md`, and `EVRIMA_QuestMutation_Fix.md` are the result. Anyone building a similar mod from scratch should read those three documents first; they would have saved most of the debugging cost.

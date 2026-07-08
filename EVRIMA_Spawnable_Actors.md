@@ -29,10 +29,12 @@ The "no AI controller" entries can be paired with a similar-physiology controlle
 
 | Species | Class path | Why to avoid |
 |---|---|---|
-| Kentrosaurus | `/Game/TheIsle/Core/Characters/Dinosaurs/Kentrosaurus/BP_Kentrosaurus.BP_Kentrosaurus_C` | Stub class without full mesh and animation data. Spawns invisible. |
-| Parasaurolophus | `/Game/TheIsle/Core/Characters/Dinosaurs/Parasaurolophus/BP_Parasaurolophus.BP_Parasaurolophus_C` | Same as above. Stub class. |
+| Kentrosaurus | `/Game/TheIsle/Core/Characters/Dinosaurs/Kentrosaurus/BP_Kentrosaurus.BP_Kentrosaurus_C` | Pre-0.21.720 finding: stub without full mesh/animation data, spawned invisible. **Kentrosaurus shipped as a full playable species in 0.21.720** — this row is stale for current builds and needs a re-probe. |
+| Parasaurolophus | `/Game/TheIsle/Core/Characters/Dinosaurs/Parasaurolophus/BP_Parasaurolophus.BP_Parasaurolophus_C` | Same pre-0.21.720 finding (stub). Post-patch status not re-probed. |
 
-These spawn cleanly (no crash), but the resulting actor is invisible and partially functional. Skip them unless you have a specific use for an invisible food source (a corpse for BodyDrop that yields food without rendering).
+These rows were probed before 0.21.720: they spawned cleanly (no crash) but invisible and partially functional. Kentrosaurus at least has since become a real playable species, so re-probe before relying on either row on current builds.
+
+Separately from these stub classes (which spawn but render invisible/partial), there is a different "invisible" case worth knowing: a cut/withheld *playable* species whose assembled blueprint the dedicated-server cook stripped entirely, so it doesn't resolve server-side at all and shows only as a hollow ghost in the spawn menu. That one is not a dead end — it can be restored to a fully playable spawn-menu entry by shipping the client-cooked blueprint back to the server in a pak and registering it at runtime, no client mod. See [EVRIMA_Cut_Dino_Enablement.md](EVRIMA_Cut_Dino_Enablement.md).
 
 ## Animals
 
@@ -158,9 +160,13 @@ local function spawnWorldActor(classPath, loc, rot)
     pcall(function() addr = actor:GetAddress() end)
     if addr == nil or addr == 0 then return nil, "nullptr-wrapper" end
 
-    -- Enable replication for client visibility
+    -- Enable replication for client visibility. SetReplicates + ForceNetUpdate
+    -- are sufficient; the actor then replicates on native distance relevancy.
+    -- Do NOT add bAlwaysRelevant here: forcing every spawned actor into each
+    -- joining client's initial replication burst is a client load-in-crash
+    -- amplifier at scale (BodyDrop v004 removed it for that reason). Use it only
+    -- for a single, deliberately always-relevant actor, never as a default.
     pcall(function() actor:SetReplicates(true) end)
-    pcall(function() actor.bAlwaysRelevant = true end)
     pcall(function() actor:ForceNetUpdate() end)
 
     return actor

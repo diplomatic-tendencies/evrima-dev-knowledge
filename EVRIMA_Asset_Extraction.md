@@ -115,7 +115,7 @@ A few patterns that look obvious but fail:
 
 ## Use case: customizer default colors
 
-Reading the default `FCustomizerDataBase` for each species. The CustomizerDataBase struct has 7 FLinearColor fields plus pattern info. Pulling the species' default values lets you display "this is what the species looks like in the box" reference imagery.
+Reading the default `FCustomizerDataBase` for each species. As of 0.21.720 the CustomizerDataBase struct has ten FLinearColor fields plus pattern/theme scalars (seven colors before the skin-overhaul patch — see `EVRIMA_Customizer_Field_Map.md` for the current layout). Pulling the species' default values lets you display "this is what the species looks like in the box" reference imagery.
 
 The procedure:
 
@@ -139,6 +139,10 @@ The procedure:
 4. Sample at growth values 0.0 through 1.0 to produce a per-species weight table.
 
 This is useful for the bot side of a kill-feed integration. The bot can compute payout from the kill event's `victim_weight_kg` field, but knowing the full curve lets the bot show "this kill was X% of an adult Tyrannosaurus" style breakdowns.
+
+## Related: shipping extracted assets back to a server
+
+Extraction isn't only for offline inspection. The same idea — pull an asset the dedicated-server cook is missing out of the client cook — is how you re-enable a cut/withheld *playable* species (Baryonyx, Oviraptor) on a server with no client mod: extract the assembled blueprint, repack it into a pak, and register it into the live class list at runtime. That path uses retoc rather than CUE4Parse (it round-trips whole assets rather than reading fields), and it has its own crash gotcha (retoc corrupts sound waves — strip audio before repacking). See [EVRIMA_Cut_Dino_Enablement.md](EVRIMA_Cut_Dino_Enablement.md).
 
 ## Closing notes
 

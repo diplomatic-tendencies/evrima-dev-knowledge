@@ -108,7 +108,7 @@ These are implemented inside CommandBridge itself and dispatch synchronously aga
 }}}
 ```
 
-BULK mode is the recommended path for website/bot integrations — one atomic SetCustomizerData call replicates without visual flicker.
+BULK mode is the recommended shape for website/bot integrations — one atomic apply, no visual flicker. **0.21.720 note:** the apply behind this verb was built on `SetCustomizerData`, which the skin-overhaul patch silently broke (the call succeeds and applies nothing). The payload format above is unchanged, but the handler's apply function must move to the direct-write recipe in [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md) — including `PatternIndex` sanitization, since one bad index now silently eats the whole apply. Note also that the payload above predates the overhaul: it carries the seven original colors but none of the new fields (`ThemeIndex`, `TeethColor`, `MouthColor`, `ClawsColor`) — extend the handler's accepted keys along with the apply rewrite if the new regions should be reachable from the bot.
 
 **Color sub-keys must be lowercase `r/g/b/a`** matching the convention used by PlayerStats events and SkinMod's save file. (Some published versions of the handler check uppercase `R/G/B/A` only — if you fork from a copy that pre-dates the 2026-05-26 fix, you'll see colors silently drop while the response claims success. Verify by reading the handler's `src.R or src.r` fallback.)
 

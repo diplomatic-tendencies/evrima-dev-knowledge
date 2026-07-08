@@ -33,7 +33,7 @@ Across roughly six months of iteration, these are the stat groups that survive a
 | Active mutations | `pawn.ReplicatedMutationsData.{MutationSlot1..4, ParentMutationSlot1..4, ElderMutationSlot1A..4A, ElderMutationSlot1B..4B}` then `:ToString()` on each FName | All 16 slots restorable; see mutation section below |
 | Elder replication stacks | `pawn:GetElderReplicationStacks()` | int32. Critical for mutation effective values; see below |
 | Quest mutation unlocks | `pawn.MutationsRequirementsData.UnlockRequiredMutations` (TArray<FName>) | Required for quest mutations to re-equip on the restored pawn |
-| Skin | 7 FLinearColor fields on `pawn:GetCustomizerData()` | See customizer field map doc |
+| Skin | color fields on `pawn.CustomizerData` (the live property — since 0.21.720 do NOT push via `SetCustomizerData`, it silently no-ops; `GetCustomizerData()` is suspect for reads too, and the struct grew to ten colors) | See customizer field map doc for the 0.21.720 recipe and its verification caveat (proven via a native C++ write; the Lua skin round-trip is pending a post-patch re-test) |
 
 FName extraction uses `:ToString()` on the FName userdata. The common mistake of `tostring(fname)` returns `"FNameUserdata: 0x..."` which is useless. Validate permissively; real mutation names like "Accelerated Prey Drive" contain spaces, only reject obvious garbage like quotes, backslashes, and control characters.
 
@@ -174,7 +174,7 @@ After all of this, the round-trippable stat list is:
 - all nine nutrient values (carbohydrate, protein, lipid, bones, cannibal, magy, rotten flesh, mushrooms, plus the bMalnutrition bool)
 - all 16 mutation slots (Slot1-4 via per-slot UFunction setters with growth-staging, Parent and Elder via field-write with FName(s) plus SetReplicatedMutationsData)
 - prime status, via the full FEligiblePrimeElder struct (see prime/elder doc, the volatile cached bool alone does not stick)
-- skin: all 7 FLinearColor customizer fields, captured and restored per-field (see customizer field map doc)
+- skin: the customizer color fields, captured and restored per-field — verified pre-patch as a 7-field round trip via the old Get/Set path; on 0.21.720 the struct is ten colors, the apply must use the direct-write recipe (see customizer field map doc), and the post-patch skin round trip is pending re-verification
 - elder replication stacks for correct Life-tier effective values
 - quest mutation unlocks list
 

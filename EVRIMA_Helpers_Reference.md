@@ -183,20 +183,9 @@ end)
 
 This is the safe-from-hook pattern. Direct `safeNotify` from a chat-hook callback violates rule 5; queueing + draining from a tick fixes it.
 
-## bumpPureBlack (inline guard, not a standalone helper)
+## bumpPureBlack (retracted — do not add this to new code)
 
-The engine appears to treat `FLinearColor(0, 0, 0)` as "unset" in some replication paths. Production SkinMod guards against this with an inline check inside its apply path — the bump triggers only when **all three** RGB channels are zero, not per-channel:
-
-```lua
--- Inside applySkin, right before writing each color field:
-if r == 0 and g == 0 and b == 0 then r, g, b = 0.01, 0.01, 0.01 end
-cdata[fieldName].R = r
-cdata[fieldName].G = g
-cdata[fieldName].B = b
-cdata[fieldName].A = 1.0
-```
-
-The visual difference between 0.0 and 0.01 is imperceptible in-game; the practical difference is colors persisting cleanly. Note: this is an inline guard in `applySkin`, not a standalone reusable function in the live codebase. The "sentinel bug" itself is folklore — no probe has cleanly reproduced the relog-reversion the workaround addresses — but the bump is cheap and the production code keeps it.
+Older revisions of these docs carried an inline guard that nudged pure-black `(0, 0, 0)` colors to `(0.01, 0.01, 0.01)` before writing, on the theory that the engine treats pure zero as "unset" in some replication paths. **That diagnosis is retracted.** Pure black renders as solid black; no probe ever reproduced the sentinel behavior; and the leading re-attribution for the original mishap is an out-of-range `PatternIndex` silently dropping a whole apply — a failure mode documented since (see the retraction section in [EVRIMA_Customizer_Field_Map.md](EVRIMA_Customizer_Field_Map.md) for the honest status of that re-attribution). The bump also has a real cost: it makes true black unreachable for players. It is being removed from the production code. If you inherited it from an older copy of these docs, delete it and add `PatternIndex` sanitization instead.
 
 ## isAdmin
 

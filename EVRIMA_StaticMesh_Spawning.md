@@ -40,15 +40,18 @@ if addr == nil or addr == 0 then
     return false, "SpawnActor returned nullptr (terrain or invalid location)"
 end
 
--- 5. Flip network flags so clients receive the actor
+-- 5. Flip network flags so clients receive the actor.
+-- SetReplicates + ForceNetUpdate are what a normal actor needs; it then
+-- replicates on native distance relevancy. Do NOT reflexively add
+-- bAlwaysRelevant (see Gotcha 3) — for a high-count/replicated spawn it is a
+-- client load-in-crash amplifier, and it does nothing for ordinary decor.
 pcall(function() actor:SetReplicates(true) end)
-pcall(function() actor.bAlwaysRelevant = true end)
 pcall(function() actor:ForceNetUpdate() end)
 
 return true, actor
 ```
 
-If `SpawnActor` fails (nullptr), retry with offset Z+1500 or scatter XY by a few hundred units. BodyDrop uses 8 retry positions.
+If `SpawnActor` fails (nullptr), resample a fresh XY near the target and re-derive ground (see Gotcha 2). Do not retry with an untraced vertical offset — an actor spawned into the void below the landscape reports success too.
 
 ---
 
@@ -135,15 +138,14 @@ Unreleased prototype set, could be assembled into a custom underground sandbox:
 
 1. **Always validate `actor:GetAddress() ~= 0`** after `SpawnActor`. Terrain collision returns a non-nil Lua wrapper around a nullptr UObject, and calling methods on it crashes the server with a 30-second-delayed AV that `pcall` cannot catch.
 
-2. **Spawn 1500 units (15m) above ground.** The terrain in EVRIMA's heightmap is uneven. If you spawn at ground Z, the actor often spawns INSIDE a hill. +1500 Z + physics-enabled actor ragdolls to true ground in under 2 seconds.
+2. **Find real ground; don't spawn at a blind vertical offset.** EVRIMA's heightmap is uneven, and spawning at a naive ground Z can clip the actor into a hill — but the fix is a downward trace to the true surface at your XY, not a fixed `+1500`. A blind offset is the trap the corpse-spawner (BodyDrop) had to remove: `SpawnActor` succeeds in the empty void *below* the landscape, so an untraced offset over the wrong spot buries the actor under the map. Trace from a high ceiling Z straight down, take the hit, spawn just above it. Note the old "+1500 and let it fall" advice only ever did anything for a **physics/ragdoll** actor (a corpse); a static decor mesh spawned at +1500 just floats at +1500.
 
-3. **Network flags are non-optional** for client visibility:
+3. **Network flags for client visibility:**
    ```lua
    actor:SetReplicates(true)
-   actor.bAlwaysRelevant = true
    actor:ForceNetUpdate()
    ```
-   Without all three, the client never sees the actor even though the server has it.
+   These two are what an actor needs; it then replicates on native distance relevancy like anything else. `bAlwaysRelevant = true` is **optional and usually wrong** here: it forces the actor into every joining client's initial replication burst, which at scale (many spawned actors, e.g. corpses) is a documented client load-in crash — BodyDrop v004 removed it for exactly that reason. Reach for it only for a single, must-always-see actor, never as a blanket "make it visible" flag.
 
 4. **DO NOT call `K2_DestroyActor`** to clean up server-side. If gameplay destroyed the actor independently (corpse-eaten, decay timer, etc.), your destroy call fires a native AV on freed memory. Even checking `GetAddress() ~= 0` first isn't safe, freed-but-not-yet-reused memory passes the check and the destroy itself crashes. For cleanup, restart the server. For tracking, use a write-once table you read for stats but never use to destroy from.
 

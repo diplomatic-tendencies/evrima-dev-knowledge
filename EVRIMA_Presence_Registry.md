@@ -193,17 +193,15 @@ The pattern looks heavier than it needs to be at first. The reason for each piec
 
 **Inline eviction on controller-gone.** If `gm:GetControllerBySteamId(steam)` returns nil, the player is truly gone. Evict immediately instead of waiting the 180-second expiry. Cuts eviction latency in practice.
 
-## Disconnect signals: none usable
+## Disconnect signals: the Blueprint-override logout hook fires
 
-Across roughly a week of testing every plausible disconnect hook, exactly zero UFunctions fire on completed disconnects.
+An earlier version of this section claimed no disconnect hook fires and heartbeat-expiry was the only eviction path. That was wrong, and the reason it was wrong is instructive: the hooks were on the wrong path. The **native** game-mode logout functions do stay dark from a Lua `RegisterHook` — `/Script/Engine.GameModeBase:K2_OnLogout`, `TIPlayerController:Logout`, `TIGameModeBase:PrintLogout`, and `SafeLogout` all register cleanly and never fire — but the **Blueprint-override** path does fire:
 
-Safe logout (lay down and hold H for 60 seconds): only `PrepareSafeLogout` fires (twice per initiation). There is no `SafeLogout` UFunction call on completion.
+- `/Game/TheIsle/Core/GameModes/BP_SurvivalGameMode.BP_SurvivalGameMode_C:K2_OnLogout` fires from Lua on **every** logout — measured on both a hard/combat disconnect and a completed safe-log (and, being the universal "player left" path, a menu logout too). The parameter is the exiting `AController`; read the steam with `ExitingController:GetSteamId():ToString()`. That read is safe (the pawn is already gone by logout, so don't touch it). It lets you evict the instant the player leaves instead of waiting on the refresh tick or the TTL.
 
-Menu logout: nothing fires.
+Safe-vs-combat log is a correlation, not a directly readable flag. `/Script/TheIsle.TIPlayerController:PrepareSafeLogout` fires on safe-log **initiation** only (twice per initiation); the BP-override `K2_OnLogout` then fires ~60 seconds later on completion. So on a `K2_OnLogout` fire, check whether a `PrepareSafeLogout` for that steam arrived in the last ~60–65 s → safe log; otherwise → combat/hard log. (The native `TIPlayerController:Logout` carries a `bWasSafeLog` bool, but that hook stays dark from Lua, so the correlation is how you recover the distinction.)
 
-Alt+F4: nothing fires.
-
-The server console logs `LogTheIsleJoinData: [...] Left The Server while not being safelogged, ...` lines, but that is an internal C++ log statement, not a Lua-hookable UFunction. The only viable eviction is the heartbeat-expiry pattern documented above.
+The server console also logs `LogTheIsleJoinData: [...] Left The Server while not being safelogged, ...`, but that is an internal C++ log line, not a hookable UFunction — the BP-override `K2_OnLogout` is the Lua-reachable equivalent. Note the sample cookbook above deliberately wires only the heartbeat + 15-second refresh + TTL (that combination is self-sufficient and was the original design). The BP-override logout hook is an **event-driven upgrade** you add on top: register it, and on each fire evict that steam immediately for instant, event-driven eviction plus safe-vs-combat classification — with the heartbeat/TTL still underneath as the safety net for anything the hook misses (crashed game-mode lookup, mod reload mid-tick).
 
 ## Verified UFunctions on the current build
 
@@ -226,7 +224,7 @@ Observational only (not in any probe source I located, but reported as non-firin
 
 These did not register on the class paths I personally tried (this is "didn't work for me at the paths I tested", not "impossible" — if you have a working hook path for any of these, please open an issue or PR):
 
-- `K2_PostLogin`, `PostLogin`, `K2_OnLogout`, `HandleStartingNewPlayer`, `GenericPlayerInitialization`, `OnPostLogin` on every game mode candidate
+- `K2_PostLogin`, `PostLogin`, `HandleStartingNewPlayer`, `GenericPlayerInitialization`, `OnPostLogin` on every game mode candidate. (Note: `K2_OnLogout` is *not* in this dead list — it registers and fires on the **Blueprint-override** path `BP_SurvivalGameMode_C:K2_OnLogout`; see "Disconnect signals" above. Only the native `/Script/Engine.GameModeBase:K2_OnLogout` stays dark.)
 - `ReceivedPlayer`, `K2_OnDestroyed`, `ServerInitConnection` on every player controller candidate
 
 The lesson: do not assume a UFunction by name. Build a spy mod that hooks every plausible candidate first, run normal play, observe which ones fire. Some of these may be reachable through a class path I didn't try; others may be dead code paths from the game's perspective.
