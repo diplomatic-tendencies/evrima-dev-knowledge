@@ -107,6 +107,20 @@ Both were done with the identical pipeline; the only per-species inputs are the 
 
 If you enable more than one, register them all in a single `SetNewAvailableClasses` call rather than one per species — each call replaces the whole list, so batching avoids clobbering.
 
+## Gotcha: the Baryonyx lunge boots the player — cap growth to 75.5%
+
+Baryonyx's pounce/lunge (its `GA_Ambush_C` variant of the shared `GA_PounceReal_C` ability) has a **vanilla blueprint defect** on 0.21.720. It reproduces on completely unmodified servers, so it is not caused by the enablement above or by your pak — but you will meet it the moment players run adult Baryonyx, so it belongs here.
+
+**The symptom:** using the lunge intermittently disconnects the *using* player — a clean, instant boot to the main menu. The client process stays alive, the server stays healthy, and at shipped log verbosity the server logs nothing, which makes it look like a client problem. It is growth-gated: near-adult Baryonyx trigger it while sub-adults lunge fine (I've only seen it past roughly 90% growth — that figure is observational, not something I've pinned exactly).
+
+**Why (dissected from the ability's bytecode; the growth figure is the observational part):** every lunge activation arms a looping ~10 Hz timer that is never cleared and sets a one-way "hit something" latch that is never reset. While that latch is false the leaked timers early-out, which is why the lunge "works several times" first. The first real contact flips the latch on permanently, and from then on the banked timers churn location/rotation and ability replication on that one player's connection until the engine closes the connection over it — the silent boot. Adult size makes the ability's close-detect trip almost immediately, which is why it only bites near full growth.
+
+**A second, server-wide effect worth knowing:** the same ability briefly applies a global time-dilation slow (scaled by the caller's ping) and restores it when the ability ends. If the ability ends abnormally — the boot itself is one such path — that slow can get **stuck server-wide**, leaving everyone in slow motion until something resets it. A high-ping Baryonyx spamming lunge can drag the whole server's tick down, not just crash itself.
+
+**The workaround I use: cap Baryonyx growth at 75.5%.** Holding every Baryonyx pawn at or below `0.755` growth keeps them in the sub-adult band that lunges cleanly, comfortably under the boot threshold — so the ability stays fully usable and nobody gets booted. Enforce it as a ceiling the same way per-species caps are held: a periodic sweep that re-asserts the cap on any Baryonyx pawn that has grown past it (see [EVRIMA_Group_Size.md](EVRIMA_Group_Size.md) for that re-stamp sweep shape). One caveat — `SetGrowth` resets a pawn's vitals to the max of the new size, so apply the cap as a one-shot when a pawn first crosses it rather than every tick, or you will thrash vitals. The tradeoff is that Baryonyx never reaches full adult size on your server.
+
+**Alternatives, if you would rather keep full growth:** strip or disable the lunge ability specifically for adult Baryonyx (keeps the size, loses the adult lunge), or fix the defect at the source — on ability end, clear the leaked timers, reset the "hit" latch, and force global time-dilation back to `1`. The source fix keeps both full growth and a working lunge but is more work, and the client runs its own *predicted* copy of the ability, so confirm in a two-client test that the fix actually stops the boot and not just the server-side half of it.
+
 ## Closing notes
 
 The mental model is: the client already has the dino; the server is the one that was handed an incomplete cook. You are not creating content, you are restoring the assembled class the server cook removed, then telling the running game mode about it through its own class-list setter. No client mod, no re-cook, no editor — extract, strip audio, repack, load past the signature check, and register at runtime.
