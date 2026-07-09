@@ -92,7 +92,6 @@ The two real blockers are the ones this doc addresses: the assembled class is ab
 
 - **The AES key rotates every patch.** Re-dump it after every game update; a stale key just fails to decrypt with no obvious "wrong key" message.
 - **If you extract with a CUE4Parse-based tool instead of retoc, watch the Oodle initialization.** Initializing the Oodle helper with a null path can bind to a decompress-only native Oodle that lacks the compressor, giving an `EntryPointNotFound` at runtime. Point it explicitly at a full `oodle-data-shared.dll` (the small oo2core copies bundled with extraction tools are decompress-only).
-- **If your server auto-restarts (a watchdog, a scheduled task), the mod DLL is file-locked while the server runs, and a plain file copy over it silently no-ops** — worse, a copy that preserves the source timestamp makes a DLL that never landed look "old" rather than "not updated," which reads like a phantom revert. Deploy a C++ side-mod DLL by stopping the server fully (it can take 25–30s to release the file handle), copying, then hash-verifying source against destination before relaunch. Don't trust the copy silently.
 
 ## Per-species specifics
 
