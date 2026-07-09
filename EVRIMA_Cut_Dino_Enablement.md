@@ -59,8 +59,6 @@ Drop the three pak files into the server's `TheIsle\Content\Paks\`. On their own
 
 To load an unsigned pak you need a signature-enforcement bypass — [UniversalSigBypasser](https://github.com/rm-NoobInCoding/UniversalSigBypasser) (the "Universal Signature Bypasser," UE5.6-confirmed) or equivalent. Install its `dsound.dll` proxy plus the `.asi` into `Binaries\Win64\`. The `dsound` proxy coexists fine with UE4SS's own `dwmapi` proxy, so this does not disturb an existing UE4SS install.
 
-> Be honest with yourself about what this is: you are disabling the server's pak-signature check so it will load a pak you built. That's a legitimate thing to do with content **you** extracted and repacked for **your own** server, and it is unrelated to client anti-cheat. It is still a server-security control you are turning off — deploy it deliberately, in a maintenance window, and know that it's a new native DLL in your server process.
-
 ### 5. Register the class at runtime — from C++, not Game.ini and not Lua
 
 With the pak loaded, the class now *exists* on the server, but nothing references it yet. It has to be added to the game mode's live class list, and the only thing that works is a C++ side mod. The two obvious shortcuts both fail:
