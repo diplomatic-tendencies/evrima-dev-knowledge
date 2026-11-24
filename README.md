@@ -12,6 +12,10 @@ The patch broke one core recipe — the customizer write. `SetCustomizerData` (w
 
 The core recipes were re-verified live on 0.21.720 and survived — the state-restore setters, chat, presence — and UE4SS 3.0.1 loads fine; the migration doc lists exactly what was re-tested. Anything not on that list survived loading and smoke testing but has not been individually re-verified, so re-verify before you lean on it. The full triage — including the update-process gotchas that produce fake "server won't boot" panics and the post-patch admin-config gotcha — is in **[EVRIMA_Patch_0.21.720_Migration.md](EVRIMA_Patch_0.21.720_Migration.md)**. Start there if you're coming back after the patch.
 
+## Game build 0.22.157 status (Linux servers)
+
+On the Linux dedicated server, 0.22.157 (Steam build 26883482) breaks the `StaticConstructObject` AOB signature that the Linux UE4SS port needs. UE4SS gives up with a fatal scan error and no Lua mod loads, while the game server itself keeps running, so the break is easy to miss. The replacement signature, the reason it broke (register reallocation) and a signature-independent way to find the function after future patches are in **[EVRIMA_Linux_UE4SS_Signatures.md](EVRIMA_Linux_UE4SS_Signatures.md)**.
+
 ## Who this is for
 
 Anyone building UE4SS Lua or C++ side mods for The Isle EVRIMA. Some prior Unreal Engine modding experience is assumed (you know what UFunctions, UClasses, USTRUCTs, and FNames are at a basic level), but no EVRIMA-specific experience is needed; every EVRIMA-specific behavior is documented from scratch.
@@ -75,6 +79,7 @@ After those five, the rest is reference material. Read as needed.
 - [EVRIMA_Asset_Extraction.md](EVRIMA_Asset_Extraction.md): CUE4Parse plus Oodle pipeline for offline extraction
 - [EVRIMA_Cut_Dino_Enablement.md](EVRIMA_Cut_Dino_Enablement.md): make a cut/withheld playable (Baryonyx, Oviraptor) spawnable server-side, no client mod — client-cooked pak plus runtime class registration
 - [EVRIMA_CPP_Side_Mods.md](EVRIMA_CPP_Side_Mods.md): UE4SS C++ side-mod toolchain
+- [EVRIMA_Linux_UE4SS_Signatures.md](EVRIMA_Linux_UE4SS_Signatures.md): the four AOB signatures UE4SS needs on the stripped Linux server binary, the 0.22.157 `StaticConstructObject` break and how to recover it after a patch
 - [EVRIMA_Client_Mod_Feasibility.md](EVRIMA_Client_Mod_Feasibility.md): what works and doesn't on the client side (EAC constraints)
 
 ## Reading patterns by goal
